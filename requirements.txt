@@ -1,0 +1,3 @@
+hls4ml
+numpy==1.23
+tensorflow==2.11
