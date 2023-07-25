@@ -35,5 +35,6 @@ with shutup:
     from .hls4ml_hook import hook_converter, update_layerconf
     from .replica import create_replica
     from .hls4ml_prj_patch import patch_hls4ml_project
+    from .bops import compute_bops, FreeBOPs, ResetMinMax, ExactBOPs
 
     hook_converter()
