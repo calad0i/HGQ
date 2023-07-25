@@ -153,7 +153,7 @@ def patch_hls4ml_project(hls4ml_proj_path: str | Path, model, inline_everything=
         header = header.replace(f'#dtypes_in_{fn_name}#', dtype).replace(f'#dtypes_out_{fn_name}#', dtype)
 
         # patch entry function
-        entry_func = entry_func.replace(f'{loc_key}', f'{loc_key}\n    {fn_name}_mask({operand_name});')
+        entry_func = entry_func.replace(f'{loc_key}', f'{loc_key}\n    {fn_name}_mask({operand_name}, {operand_name});')
 
     with open(entry_func_path, 'w') as f:
         f.write(entry_func)
