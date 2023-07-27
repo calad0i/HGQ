@@ -21,7 +21,7 @@ class PLayerBase(tf.keras.layers.Layer):
                 raise ValueError('input_container is only available for layers with a single input.')
             self._has_last_layer = True
         return self._inbound_nodes[0].inbound_layers
-    
+
     @property
     def act_bw(self):
         """Returns the bitwidth of the pre-activation values. Differentiable."""
@@ -45,15 +45,20 @@ class PLayerBase(tf.keras.layers.Layer):
     def pre_activation_quantizer(self):
         return self.last_layer.pre_activation_quantizer
 
-class Signature(tf.keras.layers.Layer):
 
-    def __init__(self, bits, **kwargs):
+class Signature(PLayerBase):
+
+    def __init__(self, keep_negative, bits, int_bits, **kwargs):
         super().__init__(**kwargs)
         self.bits = bits
+        self.int_bits = int_bits
+        self.keep_negative = keep_negative
 
     def build(self, input_shape):
         self.built = True
         self.bits = tf.broadcast_to(self.bits, (1,) + input_shape[1:])
+        self.int_bits = tf.broadcast_to(self.int_bits, (1,) + input_shape[1:])
+        self.keep_negative = tf.broadcast_to(self.keep_negative, (1,) + input_shape[1:])
 
     @tf.function(jit_compile=True)
     def call(self, x, training=None, record_minmax=None):
@@ -62,7 +67,27 @@ class Signature(tf.keras.layers.Layer):
     @property
     @tf.function(jit_compile=True)
     def act_bw(self):
-        return self.bits
+        return tf.keras.backend.cast_to_floatx(self.bits)
+
+    @property
+    def act_container(self) -> str:
+        k = self.keep_negative.numpy().max().astype(bool).item()  # type: ignore
+        i = self.int_bits.numpy().max().astype(int).item()  # type: ignore
+        b = self.bits.numpy().max().astype(int).item()  # type: ignore
+        f = b - i - k
+        return tuple_to_apf((k, i, f))
+
+    @property
+    def input_bw(self):
+        raise ValueError('Signature layer does not have input_bw')
+
+    def get_config(self):
+        return {
+            'name': self.name,
+            'cat': self.keep_negative.numpy().tolist(),  # type: ignore
+            'bits': self.bits.numpy().tolist(),  # type: ignore
+            'int_bits': self.int_bits.numpy().tolist(),  # type: ignore
+        }
 
 
 class PReshape(tf.keras.layers.Reshape, PLayerBase):

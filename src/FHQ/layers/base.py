@@ -35,9 +35,9 @@ class HLayerBase(tf.keras.layers.Layer):
         """This method should be called after calling build() method of the child class. It initializes the quantizers and sets the bops variable, and set a few flags (_has_kernel, _has_bias, _relu_act) for convenience.)"""
         self._has_kernel = False
         self._has_bias = False
-        if hasattr(self, 'kernel'):
+        if hasattr(self, 'kernel') and self.kernel is not None:
             self._has_kernel = True
-        if hasattr(self, 'bias'):
+        if hasattr(self, 'bias') and self.bias is not None:
             self._has_bias = True
         self._relu_act = hasattr(self, 'activation') and self.activation is tf.keras.activations.relu
 
@@ -89,6 +89,9 @@ class HLayerBase(tf.keras.layers.Layer):
         if record_minmax is None:
             record_minmax = training or self.record_minmax
 
+        dtype = self.dtype or tf.keras.backend.floatx()
+        x = tf.cast(x, dtype)
+        
         return self.forward(x, training=training, record_minmax=record_minmax)
 
     def forward(self, x, training=None, record_minmax=None):
@@ -145,6 +148,8 @@ class HLayerBase(tf.keras.layers.Layer):
     @property
     @tf.function(jit_compile=True)
     def qbias(self):
+        if not self._has_bias:
+            return None
         """Returns the quantized bias. non-differentiable."""
         return self.pre_activation_quantizer.bias_forward(self.bias, False, self.channel_loc)  # type: ignore
 
@@ -153,6 +158,9 @@ class HLayerBase(tf.keras.layers.Layer):
     def fused_qbias(self):
         """Returns the adjusted quantized bias to bypass explicit rounding."""
         qbias = self.qbias
+        if qbias is None:
+            return None
+        
         fbw = self.pre_activation_quantizer.fbw
         if self.channel_loc == -1:
             dims = list(range(len(fbw.shape) - 1))

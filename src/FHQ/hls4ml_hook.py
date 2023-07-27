@@ -6,6 +6,7 @@ from typing import Any
 import types
 
 from .layers import HLayerBase, PLayerBase
+from .layers import Signature
 from .utils import apf_to_tuple, tuple_to_apf
 from .replica import create_replica
 from .hls4ml_prj_patch import patch_hls4ml_project
@@ -60,6 +61,8 @@ def update_layerconf(model: keras.Model, conf: dict[str, dict], bias_accum=None)
     c = conf['LayerName']
     for layer in model.layers:
         # print(layer.name)
+            
+            
         if not isinstance(layer, HLayerBase) and not isinstance(layer, PLayerBase):
             continue
         cn = c[layer.name]['Precision']
@@ -69,6 +72,10 @@ def update_layerconf(model: keras.Model, conf: dict[str, dict], bias_accum=None)
 
         if not isinstance(layer, HLayerBase):
             continue
+        
+        if 'ParallelFactor' in cn:
+            cn['ParallelFactor'] = int(layer.parallel_factor)
+
         if layer._has_kernel or layer._has_bias:
             if bias_accum is not None:
                 accum_fp = f + bias_accum
