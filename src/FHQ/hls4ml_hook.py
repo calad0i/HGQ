@@ -73,8 +73,8 @@ def update_layerconf(model: keras.Model, conf: dict[str, dict], bias_accum=None)
         if not isinstance(layer, HLayerBase):
             continue
         
-        if 'ParallelFactor' in cn:
-            cn['ParallelFactor'] = int(layer.parallel_factor)
+        if hasattr(layer, 'parallel_factor'):
+            c[layer.name]['ParallelizationFactor'] = int(layer.parallel_factor)
 
         if layer._has_kernel or layer._has_bias:
             if bias_accum is not None:
