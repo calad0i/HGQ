@@ -89,8 +89,7 @@ strategy_dict = {
     'floor': 3,
 }
 
-_apf_m = re.compile(r'\s*(?:ap_|)(u?)fixed<\s*(\d+)\s*,\s*(\d+)[\s,_\w]*>\s*')
-
+_apf_m = re.compile(r'\s*(?:ap_|)(u?)fixed<\s*(\d+)\s*,\s*(-?\d+)[\s,_\w]*>\s*')
 
 def apf_to_tuple(apf: str):
     """Convert ap_fixed format to tuple of (keep_negative, int_bits, fp_bits)"""
