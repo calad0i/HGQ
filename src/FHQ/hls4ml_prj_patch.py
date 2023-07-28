@@ -134,7 +134,7 @@ def patch_hls4ml_project(hls4ml_proj_path: str | Path, model, inline_everything=
 
     # match to begining of nn operations
 
-    for fn_name in fn_names:
+    for fn_name in sorted(fn_names, key=len, reverse=True):
         if verbose:
             print(f'Patching {fn_name}')
         # insert mask function call
@@ -145,7 +145,7 @@ def patch_hls4ml_project(hls4ml_proj_path: str | Path, model, inline_everything=
         else:
             # general layers
             loc_key = f'// {fn_name}'
-            operand_name = re.findall(rf'\([^,]+,([^,]+)[\w,_\s]*\); {loc_key}''', entry_func)[0].strip()
+            operand_name = re.findall(rf'\([^,]+,([^,]+)[\w,_\s]*\); {loc_key}(?=\n)', entry_func)[0].strip()
 
         # get dtype. Only works for io_parallel
         dtype = re.findall(rf'([\w_]+_t) {operand_name}', entry_func)[0]
@@ -153,7 +153,7 @@ def patch_hls4ml_project(hls4ml_proj_path: str | Path, model, inline_everything=
         header = header.replace(f'#dtypes_in_{fn_name}#', dtype).replace(f'#dtypes_out_{fn_name}#', dtype)
 
         # patch entry function
-        entry_func = entry_func.replace(f'{loc_key}', f'{loc_key}\n    {fn_name}_mask({operand_name}, {operand_name});')
+        entry_func = entry_func.replace(f'{loc_key}\n', f'{loc_key}\n    {fn_name}_mask({operand_name}, {operand_name});\n')
 
     with open(entry_func_path, 'w') as f:
         f.write(entry_func)
