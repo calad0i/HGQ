@@ -26,6 +26,11 @@ class HActivation(HLayerBase, tf.keras.layers.Activation):
     def __init__(self, activation, bops_reg_factor=0., pre_activation_quantizer_config=None, **kwargs):
         super().__init__(activation=activation, bops_reg_factor=bops_reg_factor, pre_activation_quantizer_config=pre_activation_quantizer_config, **kwargs)
 
+    def post_build(self, input_shape):
+        if self.pre_activation_quantizer_config['rnd_strategy'] == 'auto':
+            self.pre_activation_quantizer_config['rnd_strategy'] = 'standard_round'
+        super().post_build(input_shape)
+
     @tf.function(jit_compile=True)
     def forward(self, x, training=None, record_minmax=None):
         x = self.activation(x)  # type: ignore
