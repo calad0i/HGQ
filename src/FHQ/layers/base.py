@@ -257,7 +257,7 @@ class HLayerBase(tf.keras.layers.Layer):
         return tuple_to_apf((kn_max, int_max, fp_max))
 
     def get_full_config(self):
-        base_config = self.get_base_config()
+        base_config = self.get_config()
         config = dict(
             kernel_quantizer_config=self.kernel_quantizer_config,
             pre_activation_quantizer_config=self.pre_activation_quantizer_config,
