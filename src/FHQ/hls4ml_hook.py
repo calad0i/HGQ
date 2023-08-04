@@ -136,6 +136,7 @@ def convert_from_fhq_model(
 
     if hls_config is None:
         hls_config = hls4ml.utils.config_from_keras_model(replica, granularity='name')
+        assert hls_config is not None
         update_layerconf(model, hls_config, bias_accum)
 
     model_hls = original_convert_from_keras_model(
