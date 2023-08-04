@@ -57,8 +57,12 @@ class FHQ:
                 self.skip_dims = (0,)
             elif self.skip_dims == 'none':
                 self.skip_dims = None
+            elif self.skip_dims == 'except_last':
+                self.skip_dims = tuple(range(len(input_shape) - 1))
+            elif self.skip_dims == 'except_1st':
+                self.skip_dims = (0,) + tuple(range(2, len(input_shape)))
             else:
-                raise ValueError('skip_dims must be tuple or str in ["all", "except_last", "batch", "channel", "none"]')
+                raise ValueError('skip_dims must be tuple or str in ["all", "except_last", "batch", "except_last", "none"]')
         _input_shape = list(input_shape)
         degeneracy = 1
         if self.skip_dims:
