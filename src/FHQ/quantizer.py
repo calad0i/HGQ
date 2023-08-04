@@ -194,7 +194,7 @@ class FHQ:
         w = self.forward(ref).numpy()  # type: ignore
         kn = (w < 0).astype(np.int8)
         high, low = self._get_arr_bits(w)
-        fb = int(max(*self.bw_clip)) + 2 - low
+        fb = int(max(*self.bw_clip)) + 2 - low  # type: ignore
         int_bits = high - low - fb
         return int_bits.astype(np.int8), fb.astype(np.int8), kn.astype(np.int8)
 
