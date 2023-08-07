@@ -204,7 +204,7 @@ class HLayerBase(tf.keras.layers.Layer):
         if self.pre_activation_quantizer.rnd_strategy != 3 and not self._has_bias:
             fp_max += 1
         assert np.sum(kn[int_bits + fp_bits <= 0]
-                      ) == 0, f'Bit counting error at {self.name}. This should never happen. Please try again with cuda disabled (2^13 or above will may in error when tensorflow is run with cuda).'
+                      ) == 0, f'Bit counting error at {self.name}. Did you forget to call `compute_bops` before passing the model to converter? Or, please try again with cuda disabled (2^13 or above will may in error when tensorflow is run with cuda. If not, this should never happen. Please open an issue at https://github.com/calad0i/HGQ'
         return tuple_to_apf((kn_max, int_max, fp_max))
 
     @property
@@ -243,7 +243,7 @@ class HLayerBase(tf.keras.layers.Layer):
         mask = int_bits + fp_bits > 0
         int_max, fp_max, kn_max = int_bits[mask].max(), fp_bits[mask].max(), kn[mask].max()
         assert np.sum(
-            kn[~mask]) == 0, f'Bit counting error at {self.name}. This should never happen. Please try again with cuda disabled (2^13 or above will may in error when tensorflow is run with cuda).'
+            kn[~mask]) == 0, f'Bit counting error at {self.name}. Did you forget to call `compute_bops` before passing the model to converter? Or, please try again with cuda disabled (2^13 or above will may in error when tensorflow is run with cuda. If not, this should never happen. Please open an issue at https://github.com/calad0i/HGQ'
         return tuple_to_apf((kn_max, int_max, fp_max))
 
     @property
@@ -252,7 +252,7 @@ class HLayerBase(tf.keras.layers.Layer):
         int_bits, fp_bits, kn = self.kernel_quantizer.get_bits_exact(self.kernel)
         mask = int_bits + fp_bits > 0
         assert np.sum(
-            kn[~mask]) == 0, f'Bit counting error at {self.name}. This should never happen. Please try again with cuda disabled (2^13 or above will may in error when tensorflow is run with cuda).'
+            kn[~mask]) == 0, f'Bit counting error at {self.name}. Please try again with cuda disabled (2^13 or above will may in error when tensorflow is run with cuda. If not, this should never happen. Please open an issue at https://github.com/calad0i/HGQ'
         int_max, fp_max, kn_max = int_bits[mask].max(), fp_bits[mask].max(), kn[mask].max()
         return tuple_to_apf((kn_max, int_max, fp_max))
 

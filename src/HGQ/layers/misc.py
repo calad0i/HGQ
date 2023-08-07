@@ -53,14 +53,14 @@ class HAdd(HLayerBase, _Merge):
         return input_shape[0]
 
 
-class HMultply(HLayerBase, _Merge):
+# class HMultply(HLayerBase, _Merge):
 
-    @tf.function(jit_compile=True)
-    def forward(self, inputs, training=None, record_minmax=None):
-        output = inputs[0]
-        for i in range(1, len(inputs)):
-            output *= inputs[i]
-        return self.pre_activation_quantizer(output, training=training, record_minmax=record_minmax)  # type: ignore
+#     @tf.function(jit_compile=True)
+#     def forward(self, inputs, training=None, record_minmax=None):
+#         output = inputs[0]
+#         for i in range(1, len(inputs)):
+#             output *= inputs[i]
+#         return self.pre_activation_quantizer(output, training=training, record_minmax=record_minmax)  # type: ignore
 
-    def compute_output_shape(self, input_shape):
-        return input_shape[0]
+#     def compute_output_shape(self, input_shape):
+#         return input_shape[0]
