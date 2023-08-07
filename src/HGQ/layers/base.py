@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from ..quantizer import FHQ
+from ..quantizer import HGQ
 from ..utils import get_default_kernel_quantizer_config, get_default_pre_activation_quantizer_config
 from ..utils import apf_to_tuple, tuple_to_apf
 
@@ -53,7 +53,7 @@ class HLayerBase(tf.keras.layers.Layer):
         """Initializes the High Granularity Quantizers for the kernel and the pre-activation values. This method is called by post_build() method."""
 
         if self._has_kernel:
-            kq = FHQ.from_config(self.kernel_quantizer_config)
+            kq = HGQ.from_config(self.kernel_quantizer_config)
             bw_shape, degeneracy = kq._compute_bw_shape_and_degeneracy(self.kernel.shape)
             fbw = self.add_weight(
                 name='kernel_bw',
@@ -67,7 +67,7 @@ class HLayerBase(tf.keras.layers.Layer):
             kq.adapt_bw_bits(self.kernel)
             self.kernel_quantizer = kq
 
-        aq = FHQ.from_config(self.pre_activation_quantizer_config)
+        aq = HGQ.from_config(self.pre_activation_quantizer_config)
         output_shape = self.compute_output_shape(input_shape)
         bw_shape, degeneracy = aq._compute_bw_shape_and_degeneracy(output_shape)
         fbw = self.add_weight(
@@ -91,7 +91,7 @@ class HLayerBase(tf.keras.layers.Layer):
 
         dtype = self.dtype or tf.keras.backend.floatx()
         x = tf.cast(x, dtype)
-        
+
         return self.forward(x, training=training, record_minmax=record_minmax)
 
     def forward(self, x, training=None, record_minmax=None):
@@ -160,7 +160,7 @@ class HLayerBase(tf.keras.layers.Layer):
         qbias = self.qbias
         if qbias is None:
             return None
-        
+
         fbw = self.pre_activation_quantizer.fbw
         if self.channel_loc == -1:
             dims = list(range(len(fbw.shape) - 1))

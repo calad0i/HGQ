@@ -90,7 +90,7 @@ _copy_weights = copy_weights
 
 
 def create_replica(model: tf.keras.Model, copy_weights=True):
-    """Create a replica model from a model with FHQ layers to be passed to hls4ml. The configs should be generated separately."""
+    """Create a replica model from a model with HGQ layers to be passed to hls4ml. The configs should be generated separately."""
     conf = get_replica_config(model)
     replica = model.__class__.from_config(conf)
     if copy_weights:

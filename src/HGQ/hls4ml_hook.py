@@ -61,8 +61,7 @@ def update_layerconf(model: keras.Model, conf: dict[str, dict], bias_accum=None)
     c = conf['LayerName']
     for layer in model.layers:
         # print(layer.name)
-            
-            
+
         if not isinstance(layer, HLayerBase) and not isinstance(layer, PLayerBase):
             continue
         cn = c[layer.name]['Precision']
@@ -72,7 +71,7 @@ def update_layerconf(model: keras.Model, conf: dict[str, dict], bias_accum=None)
 
         if not isinstance(layer, HLayerBase):
             continue
-        
+
         if hasattr(layer, 'parallel_factor'):
             c[layer.name]['ParallelizationFactor'] = int(layer.parallel_factor)
 
@@ -104,7 +103,7 @@ def update_layerconf(model: keras.Model, conf: dict[str, dict], bias_accum=None)
         c[f'{layer.name}_relu']['Precision']['result'] = layer.act_container
 
 
-def convert_from_fhq_model(
+def convert_from_hgq_model(
     model: keras.Model,
     output_dir: str = 'my-hls-test',
     project_name: str = 'myproject',
@@ -117,10 +116,10 @@ def convert_from_fhq_model(
     io_type='io_parallel',
     **kwargs: Any
 ) -> ModelGraph:
-    """Converts a FHQ Keras model to hls4ml model.
+    """Converts a HGQ Keras model to hls4ml model.
 
     Args:
-        model (keras.Model): FHQ Keras model. That is, all layers should be inherited from HLayerBase or PLayerBase.
+        model (keras.Model): HGQ Keras model. That is, all layers should be inherited from HLayerBase or PLayerBase.
         output_dir (str, optional): Output directory. Defaults to 'my-hls-test'.
         project_name (str, optional): Project name. Defaults to 'myproject'.
         input_data_tb (Any | None, optional): Input data for testbench. Defaults to None.

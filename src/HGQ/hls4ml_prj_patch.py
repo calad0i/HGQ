@@ -11,7 +11,7 @@ from .utils import tuple_to_apf, apf_to_tuple
 
 def generate_mask(layer: HLayerBase):
     """
-    Generate mask function to be patched in hls4ml project for a specific FHQ layer.
+    Generate mask function to be patched in hls4ml project for a specific HGQ layer.
 
     If the layer has a relu activation, the mask function will be applied after the activation. Otherwise, it will be applied before the activation.
 
@@ -67,7 +67,7 @@ void {name}_mask(#dtypes_in_{name}# *inp, #dtypes_out_{name}# *out) {{
 
 
 def generate_mask_header(model: keras.Model, project_name: str):
-    """ Generate mask header for a FHQ keras model"""
+    """ Generate mask header for a HGQ keras model"""
     template = f'''
 #ifndef MASK_H_
 #define MASK_H_
@@ -112,7 +112,7 @@ def patch_hls4ml_project(hls4ml_proj_path: str | Path, model, inline_everything=
     """ Patch hls4ml project with mask functions
     Args:
         hls4ml_proj_path (str|Path): Path to hls4ml project
-        model: FHQ model
+        model: HGQ model
         inline_everything: Whether to inline everything. May help with latency
         verbose: Whether to print out patching progress
     """

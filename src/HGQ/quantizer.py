@@ -10,7 +10,7 @@ log2 = tf.constant(np.log(2), dtype=tf.float32)
 
 
 @tf.function(jit_compile=True)
-def fhq_round(x: tf.Tensor, strategy: int = 0):
+def q_round(x: tf.Tensor, strategy: int = 0):
     """Round the tensor.
 
     strategy:
@@ -35,7 +35,7 @@ def fhq_round(x: tf.Tensor, strategy: int = 0):
     raise ValueError(f"Unknown strategy {strategy}")
 
 
-class FHQ:
+class HGQ:
     def __init__(self, init_bw: float, skip_dims, rnd_strategy: str | int = 'floor', exact_q_value=True, dtype=None, bw_clip=(-23, 23), trainable=True, regularizer=None, minmax_record=False):
         self.init_bw = init_bw
         self.skip_dims = skip_dims
@@ -116,7 +116,7 @@ class FHQ:
         else:
             scale = tf.pow(two, self.fbw)
 
-        xq = fhq_round(x * scale, self.rnd_strategy) / scale  # type: ignore
+        xq = q_round(x * scale, self.rnd_strategy) / scale  # type: ignore
         delta = tf.stop_gradient(xq - x)
         if training:
             prod = delta * self.fbw * log2  # type: ignore
@@ -153,7 +153,7 @@ class FHQ:
         else:
             scale = tf.pow(two, fbw)
 
-        xq = fhq_round(x * scale, self.rnd_strategy) / scale  # type: ignore
+        xq = q_round(x * scale, self.rnd_strategy) / scale  # type: ignore
         delta = tf.stop_gradient(xq - x)
 
         if training:

@@ -3,14 +3,14 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "FHQ"
-version = "0.0.1"
+name = "HGQ"
+version = "0.1.0"
 authors = [
   { name="Chang Sun", email="chsun@cern.ch" },
 ]
-description = "FHQ quantization utilities for hls4ml"
+description = "High Granularity Quantizarion for hls4ml"
 readme = "README.md"
-requires-python = "==3.10"
+requires-python = ">=3.10,<3.11"
 
 classifiers = [
     "Programming Language :: Python :: 3",

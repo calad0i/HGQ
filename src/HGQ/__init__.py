@@ -26,7 +26,7 @@ with shutup:
 
     from .utils import get_default_kernel_quantizer_config, get_default_pre_activation_quantizer_config
     from .utils import set_default_kernel_quantizer_config, set_default_pre_activation_quantizer_config
-    from .quantizer import FHQ
+    from .quantizer import HGQ
     from .layers import HDense, Signature, HQuantize, HConv1D, HConv2D
     from .layers import PReshape, PFlatten, PConcatenate
     from .layers import PMaxPool1D, PMaxPool2D, PAvgPool1D, PAvgPool2D
