@@ -20,8 +20,8 @@ def generate_mask(layer: HLayerBase):
     assert hasattr(layer, 'pre_activation_quantizer')
     is_relu = hasattr(layer, 'activation') and layer.activation is tf.keras.activations.relu
 
-    int_bits, fp_bits, kn = layer.pre_activation_quantizer.get_bits(pos_only=is_relu)  # type: ignore
-    int_bits, fp_bits, kn = int_bits.numpy().ravel(), fp_bits.numpy().ravel(), kn.numpy().ravel()
+    int_bits, fp_bits, kn = layer.pre_activation_quantizer.get_bits_exact(pos_only=is_relu)  # type: ignore
+    int_bits, fp_bits, kn = int_bits.ravel(), fp_bits.ravel(), kn.ravel()
 
     mask = (int_bits + fp_bits) <= 0
 

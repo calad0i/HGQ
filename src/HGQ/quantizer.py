@@ -188,11 +188,21 @@ class HGQ:
             int_bits = tf.floor(tf.math.log(_ref) / log2) + 1
         return int_bits, fp_bits, kn
 
-    def get_bits_exact(self, ref=None):
+    def get_bits_exact(self, ref=None, pos_only=False):
 
         if ref is None and self.minmax_record:
-            int_bits, fp_bits, kn = self.get_bits()  # type: ignore
-            return int_bits.numpy().astype(np.int8), fp_bits.numpy().astype(np.int8), kn.numpy().astype(np.int8)
+            fp_bits = tf.round(self.fbw).numpy() # type: ignore
+            with np.errstate(divide='ignore'):
+                if pos_only:
+                    _ref = np.maximum(self._max, 0.)
+                    int_bits = np.floor(np.log2(_ref)) + 1
+                    kn = np.zeros_like(self._max)
+                else:
+                    int_bits = np.maximum(np.floor(np.log2(np.abs(self._max))) + 1,
+                                        np.ceil(np.log2(np.abs(self._min)))
+                    )
+                    kn = (self._min.numpy() < 0)
+            return int_bits.astype(np.int8), fp_bits.astype(np.int8), kn.astype(np.int8)
 
         assert ref is not None
         w = self.forward(ref).numpy()  # type: ignore

@@ -121,7 +121,6 @@ class HLayerBase(tf.keras.layers.Layer):
         return int_bits + fb  # sign not considered for kernel
 
     @property
-    # @tf.function(jit_compile=True)
     def act_bw(self):
         """Returns the bitwidth of the pre-activation values. Differentiable."""
         int_bits, fp_bits, kn = self.pre_activation_quantizer.get_bits(pos_only=self._relu_act)  # type: ignore
@@ -191,8 +190,7 @@ class HLayerBase(tf.keras.layers.Layer):
     @property
     def result_container(self) -> str:
         """Returns the ap representation of the quantizers as a string."""
-        int_bits, fp_bits, kn = self.pre_activation_quantizer.get_bits(pos_only=False)  # type: ignore
-        int_bits, fp_bits, kn = int_bits.numpy().astype(np.int8), fp_bits.numpy().astype(np.int8), kn.numpy().astype(np.int8)
+        int_bits, fp_bits, kn = self.pre_activation_quantizer.get_bits_exact(pos_only=False)  # type: ignore
         int_bits, fp_bits, kn = int_bits.ravel(), fp_bits.ravel(), kn.ravel()
         mask = self.act_bw.numpy() > 0  # type: ignore
         if skip_dims := self.pre_activation_quantizer.skip_dims:
@@ -238,8 +236,7 @@ class HLayerBase(tf.keras.layers.Layer):
         """Returns the minimal ap representation of the pre-activation quantizer that can represnet all values it have seen."""
         if not self._relu_act:
             return self.result_container
-        int_bits, fp_bits, kn = self.pre_activation_quantizer.get_bits(pos_only=True)  # type: ignore
-        int_bits, fp_bits, kn = int_bits.numpy().astype(np.int8), fp_bits.numpy().astype(np.int8), kn.numpy().astype(np.int8)
+        int_bits, fp_bits, kn = self.pre_activation_quantizer.get_bits_exact(pos_only=True)  # type: ignore
         mask = int_bits + fp_bits > 0
         int_max, fp_max, kn_max = int_bits[mask].max(), fp_bits[mask].max(), kn[mask].max()
         assert np.sum(
