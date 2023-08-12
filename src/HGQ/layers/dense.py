@@ -48,7 +48,7 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
             kernel_bw = self._kernel_bw(kq)  # type: ignore
             bops = tf.reduce_sum(tf.matmul(input_bw, kernel_bw))
             self.bops.assign(bops)
-            bops = tf.cast(bops, tf.float32) * self.beta  # type: ignore
+            bops = tf.cast(bops, tf.float32) * self.beta
             if self.beta > 0:
                 pass
                 self.add_loss(tf.convert_to_tensor(bops))

@@ -106,7 +106,7 @@ class HConv(HLayerBase, Conv):
             bops = tf.reduce_sum(self.convolution_op(self.input_bw, kernel_bw))  # type: ignore
             bops = bops * self.parallel_factor / self.total_channels
             self.bops.assign(bops)
-            bops = tf.cast(bops, tf.float32) * self.beta  # type: ignore
+            bops = tf.cast(bops, tf.float32) * self.beta
             if self.beta > 0:
                 pass
                 self.add_loss(tf.convert_to_tensor(bops))
