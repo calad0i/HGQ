@@ -39,17 +39,25 @@ class HGQ:
     def __init__(self, init_bw: float, skip_dims, rnd_strategy: str | int = 'floor', exact_q_value=True, dtype=None, bw_clip=(-23, 23), trainable=True, regularizer=None, minmax_record=False):
         self.init_bw = init_bw
         self.skip_dims = skip_dims
+        """tuple: Dimensions to use uniform quantizer. If None, use full heterogenous quantizer."""
         self.rnd_strategy = strategy_dict[rnd_strategy] if isinstance(rnd_strategy, str) else rnd_strategy
+        """How to round the quantized value. 0: standard round (default, round to nearest, round-up 0.5), 1: stochastic round, 2: fast uniform noise injection (uniform noise in [-0.5, 0.5]), 3: floor"""
         self.exact_q_value = exact_q_value
+        """bool: Whether to use exact quantized value during training."""
         self.dtype = dtype
         self.bw_clip = bw_clip
+        """tuple: (min, max) of bw. 23 by default in favor of float32 mantissa."""
         self.trainable = trainable
         self.regularizer = regularizer
+        """Regularizer for bw."""
         self.minmax_record = minmax_record
+        """bool: Whether to record min and max of quantized values."""
         self.built = False
         self.degeneracy = 1
+        """Degeneracy of the quantizer. Records how many values are mapped to the same quantizer."""
 
     def _compute_bw_shape_and_degeneracy(self, input_shape):
+        """Map skip_dims to input_shape and compute degeneracy."""
         if isinstance(self.skip_dims, str):
             if self.skip_dims == 'all':
                 self.skip_dims = tuple(range(len(input_shape)))
@@ -96,6 +104,7 @@ class HGQ:
 
     @tf.function(jit_compile=True)
     def minmax_reg_reset(self):
+        """Reset min and max to inf and -inf, respectively."""
         assert self.built
         inf = tf.ones(self.fbw.shape) * float('inf')
         self._min.assign(inf)
@@ -111,6 +120,11 @@ class HGQ:
 
     @tf.function(jit_compile=True)
     def forward(self, x, training=None, record_minmax=None):
+        """Forward pass of HGQ.
+        Args:
+            training: if set to True, gradient will be propagated through the quantization process.
+            record_minmax: if set to True, min and max of quantized values will be recorded for deriving the necessary integer bits. Only necessary for activation/pre-activation values.
+        """
         if self.exact_q_value or not training:
             scale = tf.pow(two, tf.round(self.fbw))
         else:
@@ -138,7 +152,7 @@ class HGQ:
 
     @tf.function(jit_compile=True)
     def bias_forward(self, x, training=None, channel_loc=-1):
-
+        """Forward pass for the bias term. Grammatical sugar"""
         if channel_loc == -1:
             dims = list(range(len(self.fbw.shape) - 1))
         elif channel_loc == 1:
@@ -164,6 +178,12 @@ class HGQ:
 
     @tf.function(jit_compile=True)
     def get_bits(self, ref=None, quantized=None, pos_only=False):
+        """Get approximated int/frac/keep_negative bits of the equivalent fixed-point quantizer.
+        Args:
+            ref: Input tensor to compute the bits. If None, use the min/max record.
+            quantized: If input is already quantized. Skip quantization pass if set to True.
+            pos_only: If True, only compute the bits for positive values. Useful if have a ReLU layer after.
+        """
         fp_bits = tf.round(self.fbw)
         fp_bits = self.fbw + tf.stop_gradient(fp_bits - self.fbw)  # type: ignore
         if ref is not None:
@@ -184,24 +204,29 @@ class HGQ:
                 kn = tf.zeros_like(self._max)
             else:
                 _ref = tf.maximum(tf.abs(self._min), tf.abs(self._max))
-                kn = tf.keras.backend.cast_to_floatx(self._min < 0)
+                kn = tf.keras.backend.cast_to_floatx(self._min < 0)  # type: ignore
             int_bits = tf.floor(tf.math.log(_ref) / log2) + 1
         return int_bits, fp_bits, kn
 
     def get_bits_exact(self, ref=None, pos_only=False):
+        """Get exact int/frac/keep_negative bits of the equivalent fixed-point quantizer.
+        Args:
+            ref: Input tensor to compute the bits. If None, use the min/max record.
+            pos_only: If True, only compute the bits for positive values. Useful if have a ReLU layer after.
+        """
 
         if ref is None and self.minmax_record:
-            fp_bits = tf.round(self.fbw).numpy() # type: ignore
+            fp_bits = tf.round(self.fbw).numpy()  # type: ignore
             with np.errstate(divide='ignore'):
                 if pos_only:
-                    _ref = np.maximum(self._max, 0.)
+                    _ref = np.maximum(self._max, 0.)  # type:ignore
                     int_bits = np.floor(np.log2(_ref)) + 1
                     kn = np.zeros_like(self._max)
                 else:
-                    int_bits = np.maximum(np.floor(np.log2(np.abs(self._max))) + 1,
-                                        np.ceil(np.log2(np.abs(self._min)))
-                    )
-                    kn = (self._min.numpy() < 0)
+                    int_bits = np.maximum(np.floor(np.log2(np.abs(self._max))) + 1,  # type:ignore
+                                          np.ceil(np.log2(np.abs(self._min)))  # type:ignore
+                                          )
+                    kn = (self._min.numpy() < 0)  # type:ignore
             return int_bits.astype(np.int8), fp_bits.astype(np.int8), kn.astype(np.int8)
 
         assert ref is not None
@@ -213,6 +238,7 @@ class HGQ:
         return int_bits.astype(np.int8), fb.astype(np.int8), kn.astype(np.int8)
 
     def _get_arr_bits(self, k: np.ndarray):
+        """Internal helper function to compute the position of the highest and lowest bit of an array of fixed-point integers."""
         mul = int(max(*self.bw_clip)) + 2  # type: ignore
         k = k * 2**mul
         k = np.abs(k)[..., None]  # type: ignore
@@ -225,6 +251,7 @@ class HGQ:
         return high_pos.astype(np.int8), low_pos.astype(np.int8)
 
     def adapt_bw_bits(self, ref: tf.Tensor):
+        """Adapt the bitwidth of the quantizer to the input tensor, such that each input is represented with approximately the same number of bits. (i.e., 1.5 with be represented by ap_fixed<2,1> and 0.375 will be represented by ap_fixed<2,-2>)."""
         if not self.built:
             self.build(tuple(ref.shape), name=None)
         new_fbw = self.fbw - (tf.math.log(tf.abs(ref)) / log2)
@@ -235,3 +262,62 @@ class HGQ:
     @classmethod
     def from_config(cls, config):
         return cls(**config)
+
+
+# class HGQ_S(HGQ):
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+
+#     @tf.function(jit_compile=True)
+#     def forward(self, x, training=None, record_minmax=None):
+
+#         if not training:
+#             if self.exact_q_value:
+#                 scale = tf.pow(two, tf.round(self.fbw))
+#             else:
+#                 scale = tf.pow(two, self.fbw)
+
+#             xq = q_round(x * scale, self.rnd_strategy) / scale  # type: ignore
+#         else:
+#             xq = x
+
+#         if not record_minmax:
+#             return xq
+
+#         if self.skip_dims:
+#             min_xq = tf.reduce_min(xq, axis=self.skip_dims)
+#             max_xq = tf.reduce_max(xq, axis=self.skip_dims)
+#         else:
+#             min_xq = max_xq = xq
+
+#         self._min.assign(tf.minimum(min_xq, self._min))
+#         self._max.assign(tf.maximum(max_xq, self._max))
+
+#         return xq
+
+#     @tf.function(jit_compile=True)
+#     def bias_forward(self, x, training=None, channel_loc=-1):
+
+#         if channel_loc == -1:
+#             dims = list(range(len(self.fbw.shape) - 1))
+#         elif channel_loc == 1:
+#             dims = [0] + list(range(2, len(self.fbw.shape)))
+#         else:
+#             raise ValueError('channel_loc must be -1 or 1')
+
+#         fbw = tf.reduce_max(self.fbw, axis=dims, keepdims=False)
+#         if not training:
+#             if self.exact_q_value:
+#                 scale = tf.pow(two, tf.round(fbw))
+#             else:
+#                 scale = tf.pow(two, fbw)
+
+#             xq = q_round(x * scale, self.rnd_strategy) / scale  # type: ignore
+#         else:
+#             xq = x
+#         return xq
+
+#     @tf.function(jit_compile=True)
+#     def sin_reg_loss(self, x, exact_q_value=False):
+#         fbw = self.fbw if not exact_q_value else tf.round(self.fbw)
+#         return tf.reduce_sum(tf.sin(x * np.pi * (tf.pow(two, fbw) - 1)) / tf.pow(two, fbw))

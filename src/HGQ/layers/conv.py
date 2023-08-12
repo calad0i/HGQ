@@ -30,7 +30,7 @@ class HConv(HLayerBase, Conv):
         conv_op=None,
         kernel_quantizer_config=None,
         pre_activation_quantizer_config=None,
-        bops_reg_factor=0.,
+        beta=0.,
         parallel_factor: int = 1,
         **kwargs,
     ):
@@ -58,7 +58,7 @@ class HConv(HLayerBase, Conv):
             conv_op=conv_op,
             kernel_quantizer_config=kernel_quantizer_config,
             pre_activation_quantizer_config=pre_activation_quantizer_config,
-            bops_reg_factor=bops_reg_factor,
+            beta=beta,
             **kwargs,
         )
         if conv_op is not None:
@@ -106,8 +106,8 @@ class HConv(HLayerBase, Conv):
             bops = tf.reduce_sum(self.convolution_op(self.input_bw, kernel_bw))  # type: ignore
             bops = bops * self.parallel_factor / self.total_channels
             self.bops.assign(bops)
-            bops = tf.cast(bops, tf.float32) * self.bops_reg_factor  # type: ignore
-            if self.bops_reg_factor > 0:
+            bops = tf.cast(bops, tf.float32) * self.beta  # type: ignore
+            if self.beta > 0:
                 pass
                 self.add_loss(tf.convert_to_tensor(bops))
         return a
@@ -158,7 +158,7 @@ class HConv2D(HConv):
         name=None,
         kernel_quantizer_config=None,
         pre_activation_quantizer_config=None,
-        bops_reg_factor=0.,
+        beta=0.,
         parallel_factor: int = 1,
         **kwargs,
     ):
@@ -184,7 +184,7 @@ class HConv2D(HConv):
             name=name,
             kernel_quantizer_config=kernel_quantizer_config,
             pre_activation_quantizer_config=pre_activation_quantizer_config,
-            bops_reg_factor=bops_reg_factor,
+            beta=beta,
             parallel_factor=parallel_factor,
             **kwargs,
         )
@@ -213,7 +213,7 @@ class HConv1D(HConv):
         name=None,
         kernel_quantizer_config=None,
         pre_activation_quantizer_config=None,
-        bops_reg_factor=0.,
+        beta=0.,
         parallel_factor: int = 1,
         **kwargs,
     ):
@@ -239,7 +239,7 @@ class HConv1D(HConv):
             name=name,
             kernel_quantizer_config=kernel_quantizer_config,
             pre_activation_quantizer_config=pre_activation_quantizer_config,
-            bops_reg_factor=bops_reg_factor,
+            beta=beta,
             parallel_factor=parallel_factor,
             **kwargs,
         )

@@ -17,13 +17,13 @@ class HLayerBase(tf.keras.layers.Layer):
     """Abstract base class for all layers in the library. Child classes should call post_build() after calling their build() method.
     """
 
-    def __init__(self, kernel_quantizer_config=None, pre_activation_quantizer_config=None, bops_reg_factor=0., **kwargs):
+    def __init__(self, kernel_quantizer_config=None, pre_activation_quantizer_config=None, beta=0., **kwargs):
         super().__init__(**kwargs)
         self._has_kernel = None
         self._has_bias = None
         self.kernel_quantizer_config = kernel_quantizer_config or get_default_kernel_quantizer_config()
         self.pre_activation_quantizer_config = pre_activation_quantizer_config or get_default_pre_activation_quantizer_config()
-        self.bops_reg_factor = tf.Variable(bops_reg_factor, dtype=tf.float32, trainable=False, name='bops_reg_factor')
+        self.beta = tf.Variable(beta, dtype=tf.float32, trainable=False, name='beta')
         self.record_minmax = False
         self._has_last_layer = False
 
@@ -258,7 +258,7 @@ class HLayerBase(tf.keras.layers.Layer):
         config = dict(
             kernel_quantizer_config=self.kernel_quantizer_config,
             pre_activation_quantizer_config=self.pre_activation_quantizer_config,
-            bops_reg_factor=float(self.bops_reg_factor.numpy())
+            beta=float(self.beta.numpy())
         )
         return {**base_config, **config}
 

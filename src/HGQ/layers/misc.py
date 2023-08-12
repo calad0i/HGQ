@@ -7,10 +7,10 @@ from keras import activations
 
 
 class HQuantize(HLayerBase):
-    def __init__(self, pre_activation_quantizer_config=None, bops_reg_factor=0., **kwargs):
+    def __init__(self, pre_activation_quantizer_config=None, beta=0., **kwargs):
         super().__init__(
             pre_activation_quantizer_config=pre_activation_quantizer_config,
-            bops_reg_factor=bops_reg_factor,
+            beta=beta,
             **kwargs
         )
 
@@ -23,8 +23,8 @@ class HQuantize(HLayerBase):
 
 
 class HActivation(HLayerBase, tf.keras.layers.Activation):
-    def __init__(self, activation, bops_reg_factor=0., pre_activation_quantizer_config=None, **kwargs):
-        super().__init__(activation=activation, bops_reg_factor=bops_reg_factor, pre_activation_quantizer_config=pre_activation_quantizer_config, **kwargs)
+    def __init__(self, activation, beta=0., pre_activation_quantizer_config=None, **kwargs):
+        super().__init__(activation=activation, beta=beta, pre_activation_quantizer_config=pre_activation_quantizer_config, **kwargs)
 
     def post_build(self, input_shape):
         if self.pre_activation_quantizer_config['rnd_strategy'] == 'auto':
