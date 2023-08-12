@@ -8,6 +8,8 @@ This repository implements HGQ for `tensorflow.keras` models. It is independent 
 
 Notice: this repository is still under development, and the API might change in the future.
 
+## This package is still under development. Any API might change without notice at any time.
+
 ## Installation
 
 `pip install HGQ`, and you are good to go. Note that HGQ requires `python3.10` and `tensorflow>=2.11`.
