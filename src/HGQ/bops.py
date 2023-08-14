@@ -27,7 +27,7 @@ class ResetMinMax(tf.keras.callbacks.Callback):
                 layer.reset_minmax()
 
 
-class ExactBOPs(tf.keras.callbacks.Callback):
+class CalibratedBOPs(tf.keras.callbacks.Callback):
     def __init__(self, calibration_data, bsz=None):
         self.calibration_data = calibration_data
         self.bsz = bsz
@@ -36,20 +36,9 @@ class ExactBOPs(tf.keras.callbacks.Callback):
         assert isinstance(logs, dict)
         assert isinstance(self.model, keras.models.Model)
 
-        bops = 0
         data = self.calibration_data
-        for l in self.model.layers:
-            if isinstance(l, HLayerBase):
-                l.reset_minmax()
-        bsz = self.bsz or self.params['batch_size']
-        _ = model.predict(data, batch_size=bsz, verbose=0)  # type: ignore
-        for l in self.model.layers:
-            if isinstance(l, HLayerBase):
-                dbops = l.compute_exact_bops
-                bops += dbops
-        for l in self.model.layers:
-            if isinstance(l, HLayerBase):
-                l.reset_minmax()
+        bsz = self.bsz or len(data)
+        bops = compute_bops(self.model, data, bsz=bsz, verbose=False)
         logs['multi'] = bops
 
 
@@ -69,7 +58,7 @@ def compute_bops(model, dataset, bsz=16384, verbose=True, return_results=False, 
         for i in range(0, dataset.shape[0], bsz):
             r.append(model(dataset[i:i + bsz], training=False))
 
-    if cover_factor!=1.0:
+    if cover_factor != 1.0:
         assert cover_factor > 0.
         if cover_factor < 1:
             warn(f'cover_factor<1.0 will likely to result in overflows.')
@@ -77,10 +66,9 @@ def compute_bops(model, dataset, bsz=16384, verbose=True, return_results=False, 
             if not isinstance(layer, HLayerBase):
                 continue
             aq = layer.pre_activation_quantizer
-            aq._min.assign(aq(aq._min*cover_factor)) # type: ignore
-            aq._max.assign(aq(aq._max*cover_factor)) # type: ignore
-            
-            
+            aq._min.assign(aq(aq._min * cover_factor))  # type: ignore
+            aq._max.assign(aq(aq._max * cover_factor))  # type: ignore
+
     bops = 0
     for layer in model.layers:
         if isinstance(layer, HLayerBase):
