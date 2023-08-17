@@ -153,7 +153,7 @@ class PMaxPool2D(PPool2D, tf.keras.layers.MaxPool2D):
     pass
 
 
-class PAvgPool2D(PPool2D, tf.keras.layers.MaxPool2D):
+class PAvgPool2D(PPool2D, tf.keras.layers.AvgPool2D):
     pass
 
 
