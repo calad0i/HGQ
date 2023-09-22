@@ -223,9 +223,7 @@ class HGQ:
                     int_bits = np.floor(np.log2(_ref)) + 1
                     kn = np.zeros_like(self._max)
                 else:
-                    int_bits = np.maximum(np.floor(np.log2(np.abs(self._max))) + 1,  # type:ignore
-                                          np.ceil(np.log2(np.abs(self._min)))  # type:ignore
-                                          )
+                    int_bits = np.floor(np.log2(np.maximum(np.abs(self._max),np.abs(self._min)))) + 1 # type:ignore
                     kn = (self._min.numpy() < 0)  # type:ignore
             return int_bits.astype(np.int8), fp_bits.astype(np.int8), kn.astype(np.int8)
 
