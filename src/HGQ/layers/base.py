@@ -199,11 +199,20 @@ class HLayerBase(tf.keras.layers.Layer):
             int_max, fp_max, kn_max = int_bits[mask].max(), fp_bits[mask].max(), kn[mask].max()
         else:
             int_max, fp_max, kn_max = int_bits[mask].item(), fp_bits[mask].item(), kn[mask].item()
-        if self.pre_activation_quantizer.rnd_strategy != 3 and not self._has_bias:
-            fp_max += 1
+
         assert np.sum(kn[int_bits + fp_bits <= 0]
                       ) == 0, f'Bit counting error at {self.name}. Did you forget to call `compute_bops` before passing the model to converter? Or, please try again with cuda disabled (2^13 or above will may in error when tensorflow is run with cuda. If not, this should never happen. Please open an issue at https://github.com/calad0i/HGQ'
-        return tuple_to_apf((kn_max, int_max, fp_max))
+        
+        if np.prod(self.pre_activation_quantizer.fbw.shape) > 1: # ==1 means no mask should be applied
+            if self.pre_activation_quantizer.rnd_strategy != 3 and not self._has_bias:
+                fp_max += 1
+            return tuple_to_apf((kn_max, int_max, fp_max))
+        else:
+            if self.pre_activation_quantizer.rnd_strategy != 3 and not self._has_bias:
+                rnd = 'AP_RND'
+            else:
+                rnd = 'AP_TRN'
+            return tuple_to_apf((kn_max, int_max, fp_max), rnd=rnd)
 
     @property
     def last_layer(self):
