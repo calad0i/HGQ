@@ -69,6 +69,25 @@ def compute_bops(model, dataset, bsz=16384, verbose=True, return_results=False, 
             aq._min.assign(aq(aq._min * cover_factor))  # type: ignore
             aq._max.assign(aq(aq._max * cover_factor))  # type: ignore
 
+    for layer in model.layers:
+        if not hasattr(layer, 'activation'):
+            continue
+        aq = layer.pre_activation_quantizer
+        if layer.activation is tf.keras.activations.softmax:
+            # softmax_lut behaves slightly differently from softmax, which is more likely to generate exact 1s. Overflows may occur with traced min-max.
+            aq._min.assign(tf.zeros_like(aq._min))  # type: ignore
+            aq._max.assign(tf.ones_like(aq._max))  # type: ignore
+    
+        if layer.activation is tf.keras.activations.sigmoid:
+            # <0 or >1 for sigmoid does not make sense. Undo the effect of cover_factor.
+            aq._min.assign(tf.maximum(aq._min, tf.zeros_like(aq._min)))  # type: ignore
+            aq._max.assign(tf.minimum(aq._max, tf.ones_like(aq._max)))  # type: ignore
+        
+        if layer.activation is tf.keras.activations.tanh:
+            # <-1 or >1 for tanh does not make sense. Undo the effect of cover_factor.
+            aq._min.assign(tf.maximum(aq._min, -tf.ones_like(aq._min)))  # type: ignore
+            aq._max.assign(tf.minimum(aq._max, tf.ones_like(aq._max)))  # type: ignore
+    
     bops = 0
     for layer in model.layers:
         if isinstance(layer, HLayerBase):
