@@ -19,10 +19,16 @@ def generate_mask(layer: HLayerBase):
 
     assert hasattr(layer, 'pre_activation_quantizer')
     is_relu = hasattr(layer, 'activation') and layer.activation is tf.keras.activations.relu
+    is_softmax = hasattr(layer, 'activation') and layer.activation is tf.keras.activations.softmax
+    is_sigmoid = hasattr(layer, 'activation') and layer.activation is tf.keras.activations.sigmoid
+    pos_only = is_relu or is_softmax or is_sigmoid
 
-    int_bits, fp_bits, kn = layer.pre_activation_quantizer.get_bits_exact(pos_only=is_relu)  # type: ignore
+    int_bits, fp_bits, kn = layer.pre_activation_quantizer.get_bits_exact(pos_only=pos_only)  # type: ignore
+    shape = (1,) + layer.output_shape[1:]
+    int_bits = np.broadcast_to(int_bits, shape)
+    fp_bits = np.broadcast_to(fp_bits, shape)
+    kn = np.broadcast_to(kn, shape)
     int_bits, fp_bits, kn = int_bits.ravel(), fp_bits.ravel(), kn.ravel()
-
     mask = (int_bits + fp_bits) <= 0
 
     int_bits, fp_bits, kn = int_bits.astype(np.int8), fp_bits.astype(np.int8), kn.astype(np.int8)

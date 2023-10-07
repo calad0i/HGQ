@@ -2,7 +2,9 @@ import numpy as np
 import tensorflow as tf
 from functools import singledispatchmethod
 
-from .utils import strategy_dict
+from .utils import strategy_dict, L1, L2, L1L2
+
+
 
 
 two = tf.constant(2, dtype=tf.float32)
@@ -258,5 +260,5 @@ class HGQ:
         self.fbw.assign(new_fbw)
 
     @classmethod
-    def from_config(cls, config):
+    def from_config(cls, config:dict):
         return cls(**config)

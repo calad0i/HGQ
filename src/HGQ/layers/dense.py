@@ -3,7 +3,6 @@ import tensorflow as tf
 
 from .base import HLayerBase, scale_grad
 
-
 class HDense(HLayerBase, tf.keras.layers.Dense):
     def __init__(
         self,
@@ -49,9 +48,7 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
             bops = tf.reduce_sum(tf.matmul(input_bw, kernel_bw))
             self.bops.assign(bops)
             bops = tf.cast(bops, tf.float32) * self.beta
-            if self.beta > 0:
-                pass
-                self.add_loss(tf.convert_to_tensor(bops))
+            self.add_loss(tf.convert_to_tensor(bops))
         return a
 
     @tf.function(jit_compile=True)
