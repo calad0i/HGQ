@@ -8,7 +8,7 @@ This repository implements HGQ for `tensorflow.keras` models. It is independent 
 
 Notice: this repository is still under development, and the API might change in the future.
 
-## This package is still under development. Any API might change without notice at any time.
+## This package is still under development. Any API might change without notice at any time
 
 ## Installation
 
@@ -26,3 +26,11 @@ Please refer to the [FAQ](./faq.md) for more details.
 ## Citation
 
 The paper is not ready. Please check back later.
+
+## Important Usage Notice
+
+When using HGQ in your project, remember to...
+
+- [ ] Make sure `inp_q` is in the input quantizer layer's name.
+- [ ] Add `ResetMinMax` callback during training.
+- [ ] Call `compute_bops` before converting to hls4ml model.

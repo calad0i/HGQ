@@ -19,7 +19,7 @@ from HGQ.hls4ml_hook import convert_from_hgq_model
 #regularization factor on MBOPs, higher for smaller bitwidth
 beta = 1e-5 
 
-# The first layer must be quantized, either by using HQuantize or Signature layers.
+# The first layer must be quantized, either by using HQuantize or Signature layers. String 'q_inp' must be in the name of the input quantization layers.
 # The input quantization layer's name must contain 'inp_q' if you want to quantize the input heterogeneously.
 # Use only layers provided by HGQ. You can use functional API as well.
 # Please refer to the list below in this document for the full list of supported layers.
