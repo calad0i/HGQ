@@ -227,6 +227,7 @@ class HGQ:
                 else:
                     int_bits = np.floor(np.log2(np.maximum(np.abs(self._max),np.abs(self._min)))) + 1 # type:ignore
                     kn = (self._min.numpy() < 0)  # type:ignore
+            int_bits[int_bits == -np.inf] = -128
             return int_bits.astype(np.int8), fp_bits.astype(np.int8), kn.astype(np.int8)
 
         assert ref is not None
