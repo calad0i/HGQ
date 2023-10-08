@@ -57,7 +57,7 @@ def hook_converter():
     setattr(hls4ml.converters, 'convert_from_keras_model', _convert_from_keras_model)
 
 
-def update_layerconf(model: keras.Model, conf: dict[str, dict], bias_accum=None):
+def update_layerconf(model: keras.Model, conf: dict[str, dict], bias_accum=None, trace=False):
     c = conf['LayerName']
     for layer in model.layers:
         # print(layer.name)
@@ -102,6 +102,10 @@ def update_layerconf(model: keras.Model, conf: dict[str, dict], bias_accum=None)
 
         c[f'{layer.name}_relu']['Precision']['result'] = layer.act_container
 
+    if trace:
+        conf['Model']['TraceOutput']=True
+        for lc in c.values():
+            lc['Trace'] = True
 
 def convert_from_hgq_model(
     model: keras.Model,
@@ -114,6 +118,7 @@ def convert_from_hgq_model(
     bias_accum=None,
     inline_everything=False,
     io_type='io_parallel',
+    trace=False,
     **kwargs: Any
 ) -> ModelGraph:
     """Converts a HGQ Keras model to hls4ml model.
@@ -136,7 +141,7 @@ def convert_from_hgq_model(
     if hls_config is None:
         hls_config = hls4ml.utils.config_from_keras_model(replica, granularity='name')
         assert hls_config is not None
-        update_layerconf(model, hls_config, bias_accum)
+        update_layerconf(model, hls_config, bias_accum, trace=trace)
 
     model_hls = original_convert_from_keras_model(
         model=replica,
