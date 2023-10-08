@@ -38,7 +38,7 @@ def generate_mask(layer: HLayerBase):
     assert np.all(
         kn[mask] == 0), f'Bit counting error at {layer.name}. This should never happen. Please try again with cuda disabled (2^13 or above will may in error when tensorflow is run with cuda). If the error persists, please report this issue.'
 
-    if layer.pre_activation_quantizer.rnd_strategy != 3 and not hasattr(layer, 'bias'):
+    if layer.pre_activation_quantizer.rnd_strategy != 3 and not layer.can_bias_cover_rnd:
         # Use AP_RND iff not round to floor and no bias can be used to compensate
         RND = 'AP_RND'
     else:

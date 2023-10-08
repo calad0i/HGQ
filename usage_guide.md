@@ -72,7 +72,7 @@ DEFAULT_KERNEL_QUANTIZER_CONFIG = \
          skip_dims=None, 
          # How rounding is performed in training. Can choose from ['floor', 'standard_round', 'stochastic_round', 'fast_uniform_noise_injection', 'auto'].
          # In testing, 'standard_round' is used for everything except for 'floor'.
-         # 'auto': 'floor' for layer without bias except HActivation layers, 'standard_round' otherwise.
+         # 'auto': Use 'standard_round' for HActivation layers and layers with a bias for each activation quantization bin, floor otherwise.
          rnd_strategy='standard_round',
          # Whether round bitwidth to integers before applying the rounding. Defaults to True for weights and False for pre-activations.
          exact_q_value=True,

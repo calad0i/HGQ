@@ -65,6 +65,7 @@ class HConv(HLayerBase, Conv):
             warn(r'Warning: conv_op is defined. This will override the default convolution operation.')
             self.convolution_op = conv_op
         self.parallel_factor = tf.constant(parallel_factor, dtype=tf.float32)
+        self.channel_loc = 1 if self.data_format == "channels_first" else -1
 
     def post_build(self, input_shape):
         r = super().post_build(input_shape)
@@ -73,7 +74,6 @@ class HConv(HLayerBase, Conv):
         output_shape = self.compute_output_shape(input_shape)
         self.total_channels = tf.cast(tf.reduce_prod(output_shape[1:-1]), dtype=tf.float32)
         # self._bops_parallel_factor_modifier = self.parallel_factor
-        self.channel_loc = 1 if self.data_format == "channels_first" else -1
         self.kernel_quantizer.degeneracy *= float(self.parallel_factor)
         return r
 

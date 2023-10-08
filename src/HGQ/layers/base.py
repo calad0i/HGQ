@@ -4,7 +4,7 @@ import tensorflow as tf
 from ..quantizer import HGQ
 from ..utils import get_default_kernel_quantizer_config, get_default_pre_activation_quantizer_config
 from ..utils import apf_to_tuple, tuple_to_apf
-
+from ..utils import warn
 
 @staticmethod  # type: ignore
 @tf.function(jit_compile=True)
@@ -31,6 +31,23 @@ class HLayerBase(tf.keras.layers.Layer):
         super().build(input_shape)
         self.post_build(input_shape)
 
+    @property
+    def can_bias_cover_rnd(self):
+        if not self._has_bias:
+            return False
+        quantizer_shape:tuple[int,...] = tuple(self.pre_activation_quantizer.fbw.shape)
+        bias_shape:tuple[int,...] = tuple(self.bias.shape)
+        if len(bias_shape) != 1:
+            warn(f'bias shape {bias_shape} is not supported.')
+            return False
+        if np.prod(quantizer_shape) == 1:
+            return True
+        if self.channel_loc==-1:
+            return np.prod(quantizer_shape[:-1]) == 1 and bias_shape == quantizer_shape[-1:]
+        elif self.channel_loc==1:
+            return np.prod(quantizer_shape[1:]) == 1 and bias_shape == quantizer_shape[0:1]
+        return False
+        
     def post_build(self, input_shape):
         """This method should be called after calling build() method of the child class. It initializes the quantizers and sets the bops variable, and set a few flags (_has_kernel, _has_bias, _relu_act) for convenience.)"""
         self._has_kernel = False
@@ -41,13 +58,14 @@ class HLayerBase(tf.keras.layers.Layer):
             self._has_bias = True
         self._relu_act = hasattr(self, 'activation') and self.activation is tf.keras.activations.relu
 
-        if self.pre_activation_quantizer_config['rnd_strategy'] == 'auto':
-            strategy = 'floor' if not self._has_bias else 'standard_round'
-            self.pre_activation_quantizer_config['rnd_strategy'] = strategy
         self.init_quantizers(input_shape)
-
+        if not hasattr(self, 'channel_loc'):
+            self.channel_loc = -1
+        if self.pre_activation_quantizer_config['rnd_strategy'] == 'auto':
+            self.pre_activation_quantizer.rnd_strategy =  0 if self.can_bias_cover_rnd else 3
+        
         self.bops = tf.Variable(0, dtype=tf.float32, trainable=False, name='bops')
-        self.channel_loc = -1
+
 
     def init_quantizers(self, input_shape):
         """Initializes the High Granularity Quantizers for the kernel and the pre-activation values. This method is called by post_build() method."""
@@ -172,7 +190,7 @@ class HLayerBase(tf.keras.layers.Layer):
         fbw = tf.broadcast_to(fbw, qbias.shape)
         mask = tf.reduce_max(self.act_bw, axis=dims, keepdims=False) > 0
 
-        if self.pre_activation_quantizer.rnd_strategy != 3:
+        if self.pre_activation_quantizer.rnd_strategy != 3 and self.can_bias_cover_rnd:
             qbias = tf.pow(2., -tf.floor(fbw + 0.5) - 1) + qbias  # type: ignore
 
         return tf.where(mask, qbias, 0.)
@@ -205,13 +223,13 @@ class HLayerBase(tf.keras.layers.Layer):
         
         if np.prod(self.pre_activation_quantizer.fbw.shape) > 1:
             # Is in io_parallel mode, 
-            if self.pre_activation_quantizer.rnd_strategy != 3 and not self._has_bias:
+            if self.pre_activation_quantizer.rnd_strategy != 3 and not self.can_bias_cover_rnd:
                 # Using standard round and has no bias term to emulate the rounding
                 fp_max += 1
             return tuple_to_apf((kn_max, int_max, fp_max))
         else:
             # No need to do 2-stage processing, just round the result if needed
-            if self.pre_activation_quantizer.rnd_strategy != 3 and not self._has_bias:
+            if self.pre_activation_quantizer.rnd_strategy != 3 and not self.can_bias_cover_rnd:
                 rnd = 'AP_RND'
             else:
                 rnd = 'AP_TRN'
@@ -254,11 +272,11 @@ class HLayerBase(tf.keras.layers.Layer):
         assert np.sum(
             kn[~mask]) == 0, f'Bit counting error at {self.name}. Did you forget to call `compute_bops` before passing the model to converter? Or, please try again with cuda disabled (2^13 or above will may in error when tensorflow is run with cuda. If not, this should never happen. Please open an issue at https://github.com/calad0i/HGQ'
         if np.prod(self.pre_activation_quantizer.fbw.shape) > 1: # ==1 means no mask should be applied
-            if self.pre_activation_quantizer.rnd_strategy != 3 and not self._has_bias:
+            if self.pre_activation_quantizer.rnd_strategy != 3 and not self.can_bias_cover_rnd:
                 fp_max += 1
             return tuple_to_apf((kn_max, int_max, fp_max))
         else:
-            if self.pre_activation_quantizer.rnd_strategy != 3 and not self._has_bias:
+            if self.pre_activation_quantizer.rnd_strategy != 3 and not self.can_bias_cover_rnd:
                 rnd = 'AP_RND'
             else:
                 rnd = 'AP_TRN'

@@ -42,7 +42,7 @@ class HGQ:
         self.init_bw = init_bw
         self.skip_dims = skip_dims
         """tuple: Dimensions to use uniform quantizer. If None, use full heterogenous quantizer."""
-        self.rnd_strategy = strategy_dict[rnd_strategy] if isinstance(rnd_strategy, str) else rnd_strategy
+        self.rnd_strategy = strategy_dict.get(rnd_strategy,-1) if isinstance(rnd_strategy, str) else rnd_strategy
         """How to round the quantized value. 0: standard round (default, round to nearest, round-up 0.5), 1: stochastic round, 2: fast uniform noise injection (uniform noise in [-0.5, 0.5]), 3: floor"""
         self.exact_q_value = exact_q_value
         """bool: Whether to use exact quantized value during training."""
