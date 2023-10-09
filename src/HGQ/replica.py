@@ -60,7 +60,7 @@ def get_replica_config(model: tf.keras.Model):
                 inp_name = inbound_node[0][0][0]
             else:
                 inp_name = names[i - 1]  # sequential model
-            assert layer_configs[inp_name]['class_name'] == 'InputLayer'
+            assert layer_configs[inp_name]['class_name'] == 'InputLayer', f"HQuantize layer {name} is not connected to an InputLayer."
             layer_configs[inp_name]['config']['name'] = name  # rename the input layer to the name of the quantize layer
             if 'name' in layer_configs[inp_name]:
                 layer_configs[inp_name]['name'] = name

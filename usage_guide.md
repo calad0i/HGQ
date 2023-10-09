@@ -20,7 +20,7 @@ from HGQ.hls4ml_hook import convert_from_hgq_model
 beta = 1e-5 
 
 # The first layer must be quantized, either by using HQuantize or Signature layers. String 'q_inp' must be in the name of the input quantization layers.
-# The input quantization layer's name must contain 'inp_q' if you want to quantize the input heterogeneously.
+# The input quantization layer's name must contain 'inp_q' or 'h_quantize' if you want to quantize the input heterogeneously.
 # Use only layers provided by HGQ. You can use functional API as well.
 # Please refer to the list below in this document for the full list of supported layers.
 model = Sequential([
@@ -109,7 +109,7 @@ When changing the quantizer configs for a specific layer, pass the config dict t
 
 Layers that (can) do HG quantization on the (pre-)activation values:
 
-`HQuantize`: Quantize the input to the next layer. When used just after the input layer, add the `inp_q` keyword to the name of the layer. The user must use this layer or `Signature` layer directly after the input layer.
+`HQuantize`: Quantize the input to the next layer. When used just after the input layer, add the `inp_q` (or `h_quantize` by default) keyword to the name of the layer. The user must use this layer or `Signature` layer directly after the input layer.
 
 `HDense`: Dense layer with HGQ.
 

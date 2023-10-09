@@ -5,7 +5,7 @@ from tensorflow import keras
 from typing import Any
 import types
 
-from .layers import HLayerBase, PLayerBase
+from .layers import HLayerBase, PLayerBase, HActivation
 from .layers import Signature
 from .utils import apf_to_tuple, tuple_to_apf
 from .replica import create_replica
@@ -93,14 +93,16 @@ def update_layerconf(model: keras.Model, conf: dict[str, dict], bias_accum=None,
         if not hasattr(layer, '_relu_act'):
             continue
 
+        print(layer.name, layer._relu_act)
         if not layer._relu_act:
             for name in c:
                 if name.startswith(f'{layer.name}_'):
                     c[name]['Precision']['result'] = result
                     break
             continue
-
-        c[f'{layer.name}_relu']['Precision']['result'] = layer.act_container
+        if not isinstance(layer, HActivation):
+            # This is the ReLU layer, no further activation layer follows
+            c[f'{layer.name}_relu']['Precision']['result'] = layer.act_container
 
     if trace:
         conf['Model']['TraceOutput']=True

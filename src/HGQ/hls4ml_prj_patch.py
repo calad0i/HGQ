@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
-from .layers import HLayerBase
+from .layers import HLayerBase, HActivation
 from .utils import tuple_to_apf, apf_to_tuple
 
 
@@ -57,7 +57,8 @@ def generate_mask(layer: HLayerBase):
     if not xfr:
         return '', name
 
-    if is_relu:
+    if is_relu and not isinstance(layer, HActivation):
+        # No extra relu after HActivation layer, which is just doing the activation
         name += '_relu'
 
     body = '    \n'.join(xfr)
@@ -115,6 +116,7 @@ def read_purge_auto_defined_vars(entry_func_path):
 
 
 def patch_hls4ml_project(hls4ml_proj_path: str | Path, model, inline_everything=False, verbose=False):
+    verbose=True
     """ Patch hls4ml project with mask functions
     Args:
         hls4ml_proj_path (str|Path): Path to hls4ml project
@@ -144,17 +146,25 @@ def patch_hls4ml_project(hls4ml_proj_path: str | Path, model, inline_everything=
         if verbose:
             print(f'Patching {fn_name}')
         # insert mask function call
-        if 'inp_q' in fn_name:
+        if 'inp_q' in fn_name or 'h_quantize' in fn_name:
             # input masking
             loc_key = f'// hls-fpga-machine-learning insert layers'
             operand_name = fn_name
         else:
             # general layers
             loc_key = f'// {fn_name}'
-            operand_name = re.findall(rf'\([^,]+,([^,]+)[\w,_\s]*\); {loc_key}(?=\n)', entry_func)[0].strip()
-
+            if 'h_add' not in fn_name:
+                found = re.findall(rf'\([^,]+,([^,]+)[\w,_\s]*\); {loc_key}(?=\n)', entry_func)
+            else:
+                found = re.findall(rf'\(.+,([^,]+)[\w,_\s]*\); {loc_key}(?=\n)', entry_func)
+            if not found:
+                raise RuntimeError(f'Failed to find {fn_name} in entry function')
+            operand_name = found[0].strip()
         # get dtype. Only works for io_parallel
-        dtype = re.findall(rf'([\w_]+_t) {operand_name}', entry_func)[0]
+        found = re.findall(rf'([\w_]+_t) {operand_name}', entry_func)
+        if not found:
+            raise RuntimeError(f'Failed to find dtype for {fn_name} with operand name {operand_name}.')
+        dtype = found[0] 
         # replace dtype placeholders
         header = header.replace(f'#dtypes_in_{fn_name}#', dtype).replace(f'#dtypes_out_{fn_name}#', dtype)
 

@@ -31,6 +31,6 @@ The paper is not ready. Please check back later.
 
 When using HGQ in your project, remember to...
 
-- [ ] Make sure `inp_q` is in the input quantizer layer's name.
+- [ ] Make sure `inp_q` or `h_quantize` (default) is in the input quantizer layer's name.
 - [ ] Add `ResetMinMax` callback during training.
 - [ ] Call `compute_bops` before converting to hls4ml model.

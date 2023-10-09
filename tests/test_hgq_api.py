@@ -89,7 +89,7 @@ def test_end2end(N:int, rnd_strategy:str, io_type:str, backend:str):
         backend=backend,
         )
     model_hls.compile()
-    r_hls = model_hls.predict(data[1:2]).reshape((1,10))
+    r_hls = model_hls.predict(data[1:2]).reshape((1,10)) # type: ignore
 
     print(r_keras)
     print(r_hls)
