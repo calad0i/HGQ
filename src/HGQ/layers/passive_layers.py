@@ -41,11 +41,6 @@ class PLayerBase(tf.keras.layers.Layer):
     def result_container(self) -> str:
         return self.act_container
 
-    @property
-    def pre_activation_quantizer(self):
-        return self.last_layer.pre_activation_quantizer
-
-
 class Signature(PLayerBase):
 
     def __init__(self, keep_negative, bits, int_bits, **kwargs):
