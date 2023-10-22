@@ -41,10 +41,6 @@ class PLayerBase(tf.keras.layers.Layer):
     def result_container(self) -> str:
         return self.act_container
 
-    @property
-    def pre_activation_quantizer(self):
-        return self.last_layer.pre_activation_quantizer
-
 
 class Signature(PLayerBase):
 
@@ -149,17 +145,23 @@ class PPool1D(PLayerBase, Pooling1D):
         return tf.nn.max_pool1d(act_bw, ksize=self.pool_size, strides=self.strides, padding=self.padding.upper(), data_format=self._tf_data_format)
 
 
-class PMaxPool2D(PPool2D, tf.keras.layers.MaxPool2D):
+class PMaxPooling2D(PPool2D, tf.keras.layers.MaxPool2D):
     pass
 
 
-class PAvgPool2D(PPool2D, tf.keras.layers.AvgPool2D):
+class PAveragePooling2D(PPool2D, tf.keras.layers.AvgPool2D):
     pass
 
 
-class PMaxPool1D(PPool1D, tf.keras.layers.MaxPool1D):
+class PMaxPooling1D(PPool1D, tf.keras.layers.MaxPool1D):
     pass
 
 
-class PAvgPool1D(PPool1D, tf.keras.layers.AvgPool1D):
+class PAveragePooling1D(PPool1D, tf.keras.layers.AvgPool1D):
     pass
+
+
+PMaxPool2D = PMaxPooling2D
+PAvgPool2D = PAveragePooling2D
+PMaxPool1D = PMaxPooling1D
+PAvgPool1D = PAveragePooling1D

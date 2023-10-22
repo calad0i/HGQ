@@ -72,12 +72,12 @@ class HGQ:
             elif self.skip_dims == 'except_1st':
                 self.skip_dims = (0,) + tuple(range(2, len(input_shape)))
             else:
-                raise ValueError('skip_dims must be tuple or str in ["all", "except_last", "batch", "except_last", "none"]')
+                raise ValueError('skip_dims must be tuple or str in ["all", "except_last", "batch", "except_last", "none"]')            
         _input_shape = list(input_shape)
         degeneracy = 1
         if self.skip_dims:
             for d in self.skip_dims:
-                degeneracy *= _input_shape[d] if _input_shape[d] is not None else 1
+                degeneracy *= int(_input_shape[d]) if _input_shape[d] is not None else 1
                 _input_shape[d] = 1
         return _input_shape, degeneracy
 

@@ -1,6 +1,7 @@
 import tensorflow as tf
 
 from ..layers.base import HLayerBase
+from ..utils import apf_to_tuple, tuple_to_apf
 
 from keras.layers.merging.base_merge import _Merge
 from keras import activations
@@ -38,6 +39,12 @@ class HActivation(HLayerBase, tf.keras.layers.Activation):
 
     def compute_output_shape(self, input_shape):
         return input_shape
+
+    @property
+    def table_container(self) -> str:
+        if self.activation is not tf.keras.activations.softmax:
+            return self.result_container
+        return 'ap_fixed<18,8,AP_RND>'  # No bit-match for softmax anyway, just maxout it for now.
 
 
 class HAdd(HLayerBase, _Merge):
