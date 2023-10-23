@@ -1,3 +1,4 @@
+from typing import Callable
 import tensorflow as tf
 
 from ..layers.base import HLayerBase
@@ -30,10 +31,22 @@ class HActivation(HLayerBase, tf.keras.layers.Activation):
     def post_build(self, input_shape):
         if self.pre_activation_quantizer_config['rnd_strategy'] == 'auto':
             self.pre_activation_quantizer_config['rnd_strategy'] = 'standard_round'
+
+        if self.pre_activation_quantizer_config['rnd_strategy'] not in ('floor', 3):
+            # Jit when using standard round. Very unlikely to have errors.
+            self.forward: Callable = tf.function(jit_compile=True)(self.__forward)  # type: ignore
+            
+        elif self.activation in (activations.relu, activations.linear, activations.relu6, activations.leaky_relu):
+            # Jit when activation is more or less linear.
+            self.forward: Callable = tf.function(jit_compile=True)(self.__forward)  # type: ignore
+    
+        else:
+            self.forward: Callable = self.__forward
+    
         super().post_build(input_shape)
 
-    @tf.function(jit_compile=True)
-    def forward(self, x, training=None, record_minmax=None):
+    # @tf.function(jit_compile=True)
+    def __forward(self, x, training=None, record_minmax=None):
         x = self.activation(x)  # type: ignore
         return self.pre_activation_quantizer(x, training=training, record_minmax=record_minmax)  # type: ignore
 
