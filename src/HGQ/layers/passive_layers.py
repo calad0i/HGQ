@@ -16,10 +16,8 @@ class PLayerBase(tf.keras.layers.Layer):
 
     @property
     def last_layer(self):
-        if not self._has_last_layer:
-            if len(self._inbound_nodes) != 1:
-                raise ValueError('input_container is only available for layers with a single input.')
-            self._has_last_layer = True
+        assert len(self._inbound_nodes) ==1, f'input_container is only available for layers used only once. {self.name} is used {len(self._inbound_nodes)} times.'
+        assert not isinstance(self._inbound_nodes[0].inbound_layers, list), f'input_container is only available for layers with a single input. {self.name} has {len(self._inbound_nodes[0].inbound_layers)} inputs.'
         return self._inbound_nodes[0].inbound_layers
 
     @property

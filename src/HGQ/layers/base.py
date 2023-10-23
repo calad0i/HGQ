@@ -153,7 +153,7 @@ class HLayerBase(tf.keras.layers.Layer):
     def input_bw(self):
         try:
             return self.last_layer.act_bw
-        except ValueError:
+        except AssertionError:
             return None
 
     @property
@@ -237,10 +237,8 @@ class HLayerBase(tf.keras.layers.Layer):
 
     @property
     def last_layer(self):
-        if not self._has_last_layer:
-            if len(self._inbound_nodes) != 1:
-                raise ValueError(f'input_container is only available for layers with a single input. {self.name} has {len(self._inbound_nodes)} inputs.')
-            self._has_last_layer = True
+        assert len(self._inbound_nodes) ==1, f'input_container is only available for layers used only once. {self.name} is used {len(self._inbound_nodes)} times.'
+        assert not isinstance(self._inbound_nodes[0].inbound_layers, list), f'input_container is only available for layers with a single input. {self.name} has {len(self._inbound_nodes[0].inbound_layers)} inputs.'
         return self._inbound_nodes[0].inbound_layers
 
     @property
@@ -292,17 +290,16 @@ class HLayerBase(tf.keras.layers.Layer):
         int_max, fp_max, kn_max = int_bits[mask].max(), fp_bits[mask].max(), kn[mask].max()
         return tuple_to_apf((kn_max, int_max, fp_max))
 
-    # def get_config(self):
-    #     base_config = super().get_config()
-    #     config = dict(
-    #         kernel_quantizer_config=self.kernel_quantizer_config,
-    #         pre_activation_quantizer_config=self.pre_activation_quantizer_config,
-    #         beta=float(self.beta.numpy()) # type: ignore
-    #     )
-    #     return {**base_config, **config}
+    def get_config(self):
+        base_config = super().get_config()
+        config = dict(
+            kernel_quantizer_config=self.kernel_quantizer_config,
+            pre_activation_quantizer_config=self.pre_activation_quantizer_config,
+            beta=float(self.beta.numpy()) # type: ignore
+        )
+        return {**base_config, **config}
 
-    def get_hls4ml_config(self):
-        config = self.get_config()
-        config['layer_object'] = self
+    def get_keras_config(self):
+        config = super().get_config()
         return config
         
