@@ -38,11 +38,11 @@ class CalibratedBOPs(tf.keras.callbacks.Callback):
 
         data = self.calibration_data
         bsz = self.bsz or len(data)
-        bops = compute_bops(self.model, data, bsz=bsz, verbose=False)
+        bops = trace_minmax(self.model, data, bsz=bsz, verbose=False)
         logs['multi'] = bops
 
 
-def compute_bops(model, dataset, bsz=16384, verbose=True, return_results=False, rst=True, cover_factor=1.0):
+def trace_minmax(model, dataset, bsz=16384, verbose=True, return_results=False, rst=True, cover_factor=1.0):
     if rst:
         for layer in model.layers:
             if isinstance(layer, HLayerBase):
