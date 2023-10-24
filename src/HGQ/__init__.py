@@ -32,9 +32,4 @@ with shutup:
     from .layers import PMaxPool1D, PMaxPool2D, PAvgPool1D, PAvgPool2D
     from .layers import Signature
     from .layers import PFlatten, PReshape
-    from .hls4ml_hook import hook_converter, update_layerconf
-    from .replica import create_replica
-    from .hls4ml_prj_patch import patch_hls4ml_project
     from .bops import trace_minmax, FreeBOPs, ResetMinMax, CalibratedBOPs
-
-    hook_converter()

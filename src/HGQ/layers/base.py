@@ -272,13 +272,15 @@ class HLayerBase(tf.keras.layers.Layer):
         if np.prod(self.pre_activation_quantizer.fbw.shape) > 1: # ==1 means no mask should be applied
             if self.pre_activation_quantizer.rnd_strategy != 3 and not self.can_bias_cover_rnd:
                 fp_max += 1
-            return tuple_to_apf((0, int_max, fp_max))
+            fixed = tuple_to_apf((0, int_max, fp_max))
         else:
             if self.pre_activation_quantizer.rnd_strategy != 3 and not self.can_bias_cover_rnd:
-                rnd = 'AP_RND'
+                rnd = 'RND'
             else:
-                rnd = 'AP_TRN'
-            return tuple_to_apf((0, int_max, fp_max), rnd=rnd)
+                rnd = 'TRN'
+            fixed = tuple_to_apf((0, int_max, fp_max), rnd=rnd)
+        assert fixed != 'nuke', f'{self.name} has no non-zero activation bits. Please check your model.'
+        return fixed
 
     @property
     def ker_container(self):

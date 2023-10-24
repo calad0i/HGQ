@@ -42,7 +42,7 @@ class CalibratedBOPs(tf.keras.callbacks.Callback):
         logs['multi'] = bops
 
 
-def trace_minmax(model, dataset, bsz=16384, verbose=True, return_results=False, rst=True, cover_factor=1.0):
+def trace_minmax(model, dataset, bsz=16384, verbose=True, return_predictions=False, no_bops_comtation=False, rst=True, cover_factor=1.0):
     if rst:
         for layer in model.layers:
             if isinstance(layer, HLayerBase):
@@ -88,6 +88,9 @@ def trace_minmax(model, dataset, bsz=16384, verbose=True, return_results=False, 
             aq._min.assign(tf.maximum(aq._min, -tf.ones_like(aq._min)))  # type: ignore
             aq._max.assign(tf.minimum(aq._max, tf.ones_like(aq._max)))  # type: ignore
 
+    if no_bops_comtation:
+        return -1
+
     bops = 0
     for layer in model.layers:
         if isinstance(layer, HLayerBase):
@@ -96,7 +99,8 @@ def trace_minmax(model, dataset, bsz=16384, verbose=True, return_results=False, 
             bops += dbops
             if verbose:
                 print(f'{layer.name}: {dbops}')
-    if not return_results:
-        return bops
 
-    return bops, np.concatenate(r, axis=0)
+    if return_predictions:
+        return bops, np.concatenate(r, axis=0)
+
+    return bops
