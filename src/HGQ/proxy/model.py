@@ -120,14 +120,14 @@ def to_keras_layers(layer: HLayerBase | PLayerBase, name: str) -> tuple[keras.la
         return klayer,
 
 
-def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP') -> tuple[FixedPointQuantizer, ...]:
+def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', aggressive=True, accum_bits_bias=None) -> tuple[FixedPointQuantizer, ...]:
     if isinstance(layer, Signature):
         return FixedPointQuantizer(layer.keep_negative, layer.bits, layer.int_bits, 'TRN', SAT),
 
     quantizer = layer.pre_activation_quantizer
 
     relu_act = layer._relu_act
-    hls_config = None
+    overriddes = None
     if layer._has_kernel:
         if isinstance(layer, keras.layers.Dense):
             multiplicity = np.prod(layer.kernel.shape) / layer.units
@@ -136,7 +136,7 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP') -> 
         else:
             multiplicity = 1024
             warn(f'Unknown layer type {layer.__class__.__name__} to compute accumlation multiplicity for bitgrowth. If you are not using bitgrowth, ignore this warning.')
-        hls_config = {'last_layer': {'weight_t': layer.ker_container, '_accum_multiplicity': multiplicity}}
+        overriddes = {'layers': {name: {'weight_t': layer.ker_container, '_accum_multiplicity': multiplicity}}}
 
     int_bits, fp_bits, kn = quantizer.get_bits_exact(pos_only=False)  # type: ignore
     if quantizer.rnd_strategy != 3 and not layer.can_bias_cover_rnd:
@@ -146,7 +146,7 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP') -> 
 
     if not relu_act:
         k, b, i = kn, kn + int_bits + fp_bits, kn + int_bits
-        return FixedPointQuantizer(k, b, i, RND, SAT, name=f'{name}_quantizer', hls_config=hls_config),
+        return FixedPointQuantizer(k, b, i, RND, SAT, name=f'{name}_quantizer', overrides=overriddes, aggressive=aggressive, accum_bits_bias=accum_bits_bias),
 
     k, i, f = tf.reduce_max(kn, keepdims=True), tf.reduce_max(int_bits, keepdims=True), tf.reduce_max(fp_bits, keepdims=True)
     k, b, i = k, k + i + f, k + i
@@ -154,7 +154,7 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP') -> 
     # If there is a rounding following the layer, keep one extra bit and do NOT round perserve bit accuracy.
     if RND != 'TRN':
         b += 1
-    layer_quantizer = FixedPointQuantizer(k, b, i, 'TRN', SAT, name=f'{name}_quantizer', hls_config=hls_config)
+    layer_quantizer = FixedPointQuantizer(k, b, i, 'TRN', SAT, name=f'{name}_quantizer', overrides=overriddes, aggressive=aggressive, accum_bits_bias=accum_bits_bias)
     int_bits, fp_bits, kn = quantizer.get_bits_exact(pos_only=True)  # type: ignore
     if quantizer.rnd_strategy != 3 and not layer.can_bias_cover_rnd:
         RND = 'RND'
@@ -166,7 +166,7 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP') -> 
     return layer_quantizer, relu_quantizer
 
 
-def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = None, SAT='WRAP'):
+def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = None, SAT='WRAP', aggressive: bool = True, accum_bits_bias=None):
     if namer is not None:
         name = namer.next_name(layer.name)
     else:
@@ -176,7 +176,7 @@ def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = 
     if hasattr(keras.layers, layer.__class__.__name__[1:]):
         proxy_layers = to_keras_layers(layer, name)
     if hasattr(layer, 'pre_activation_quantizer'):
-        proxy_quantizer_layers = extract_quantizers(layer, name, SAT)
+        proxy_quantizer_layers = extract_quantizers(layer, name, SAT, aggressive, accum_bits_bias)
     if len(proxy_layers) > len(proxy_quantizer_layers) and isinstance(layer, HLayerBase):
         warn(f'Layer {layer.name} does not have a quantizer attached!')
     assert proxy_layers or proxy_quantizer_layers, f'Failed to convert layer {layer.name}: layer not mapped to anything.'
@@ -191,9 +191,14 @@ def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = 
     return tensor
 
 
-def generate_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits_bias=None):
+def generate_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits_bias: int | None = None):
 
     input_nodes, output_nodes, dependencies_list = solve_dependencies(model)
+
+    if accum_bits_bias is not None and not aggressive:
+        warn('You are using bitgrowth (aggressive=False) together with bias_accum_bits set. This is not recommended. If you are sure what you are doing, ignore this warning.')
+    if accum_bits_bias is not None and accum_bits_bias < 0:
+        warn('You are using a negative value for bias_accum_bits. Please make sure you know what you are doing.')
 
     nof_output = len(output_nodes)
     inputs = [keras.layers.Input(shape=node.input_shapes[0][1:]) for node in input_nodes]
@@ -211,7 +216,7 @@ def generate_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits
             inps = [satisfied[node] for node in requires]
             if len(inps) == 1:
                 inps = inps[0]
-            out = apply_proxy_layers(layer, inps, namer=namer)
+            out = apply_proxy_layers(layer, inps, namer=namer, SAT=SAT, aggressive=aggressive, accum_bits_bias=accum_bits_bias)
             satisfied[provides] = out
             if provides in output_nodes:
                 outputs.append(out)
@@ -221,4 +226,8 @@ def generate_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits
                 raise RuntimeError('Infinite loop detected.')
             dependencies_list.append((layer, requires, provides))
 
+    if len(outputs) == 1:
+        outputs = outputs[0]
+    if len(inputs) == 1:
+        inputs = inputs[0]
     return keras.Model(inputs=inputs, outputs=outputs)

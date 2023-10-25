@@ -1,3 +1,6 @@
+import re
+from typing import Optional, Generator
+
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -144,18 +147,19 @@ def fixed(bits, integer_bits, RND='TRN', SAT='WRAP') -> Callable:
 
 class FixedPointQuantizer(keras.layers.Layer):
 
-    def __init__(self, keep_negative, bits, integers, RND: str = 'TRN', SAT: str = 'WRAP', hls_config: dict | None = None, aggressive=True, **kwargs):
+    def __init__(self, keep_negative, bits, integers, RND: str = 'TRN', SAT: str = 'WRAP', overrides: dict | None = None, aggressive=True, accum_bits_bias=None, **kwargs):
         self.keep_negative = tf.Variable(keep_negative, dtype='int8', name='keep_negative', trainable=False)
         self.bits = tf.Variable(bits, dtype='int8', name='bits', trainable=False)
         self.integers = tf.Variable(integers, dtype='int8', name='integers', trainable=False)
         assert self.keep_negative.shape == self.bits.shape == self.integers.shape, f'Shapes mismatch: keep_negative, bits, and integers must have the same shape. Got {self.keep_negative.shape}, {self.bits.shape}, {self.integers.shape}.'
 
+        self.accum_bits_bias = accum_bits_bias
         self.RND = RND
         self.SAT = SAT
         self.aggressive = aggressive
         if not aggressive and SAT == 'WRAP':
-            warn('aggressive=False and SAT=WRAP seems to be odd.')
-        self.hls_config = hls_config
+            warn('It\'s odd that aggressive=False and SAT=WRAP are used together. Though probably no one should never do this, you are the boss.')
+        self.overrides = overrides
         kwargs.pop('trainable', None)
         self._quantizer_created = False
 
@@ -175,71 +179,131 @@ class FixedPointQuantizer(keras.layers.Layer):
     @property
     def result_t(self):
         """result_t to be used for the last layer and this layer's outputs."""
+        return tuple_to_apf(self.result_t_kif, 'TRN', 'WRAP')
+
+    @property
+    def result_t_last(self):
+        """result_t to be used for the last layer and this layer's outputs."""
         k, i, f = self.result_t_kif
-        u = '' if k != 0 else 'u'
-        if self.delete_me:
-            return f'{u}fixed<{i+i+f},{k+i},{self.RND},{self.SAT}>'
+        if self.removable:
+            result_t_last = tuple_to_apf((k, i, f), self.RND, self.SAT)
         else:
-            return f'{u}fixed<{i+i+f},{k+i},TRN,WRAP>'
+            if self.SAT != 'WRAP':
+                result_t_last = self.accum_t  # If the last layer is kernel-operation type (has accum_t)
+                if result_t_last is not None:
+                    k, i, _ = apf_to_tuple(result_t_last)
+                    result_t_last = tuple_to_apf((k, i, f + 1), 'TRN', self.SAT)
+                else:
+                    result_t_last = tuple_to_apf((k, i, f + 1), 'TRN', self.SAT)  # If not, last layer is of activation type
+            elif self.RND != 'TRN':
+                k, i, f = self.result_t_kif
+                result_t_last = tuple_to_apf((k, i, f + 1), 'TRN', 'WRAP')  # Take care of the rounding mode
+            else:
+                result_t_last = tuple_to_apf((k, i, f), 'TRN', 'WRAP')  # Nothing to take care of.
+        return result_t_last
 
     @staticmethod
-    def last_layer(layer: keras.layers.Layer):
+    def get_last_layer(layer: keras.layers.Layer) -> keras.layers.Layer:
         assert len(layer._inbound_nodes) == 1, f'input_container is only available for layers used only once. {layer.name} is used {len(layer._inbound_nodes)} times.'
         assert not isinstance(layer._inbound_nodes[0].inbound_layers, list), f'input_container is only available for layers with a single input. {layer.name} has {len(layer._inbound_nodes[0].inbound_layers)} inputs.'
         return layer._inbound_nodes[0].inbound_layers
 
+    @staticmethod
+    def get_next_layer(layer: keras.layers.Layer) -> Optional[keras.layers.Layer]:
+        if len(layer._outbound_nodes) == 0:
+            return None
+        assert len(layer._outbound_nodes) == 1, f'output_container is only available for layers used only once. {layer.name} is used {len(layer._outbound_nodes)} times.'
+        assert not isinstance(layer._outbound_nodes[0].outbound_layer, list), f'output_container is only available for layers with a single output. {layer.name} has {len(layer._outbound_nodes[0].outbound_layer)} outputs.'
+        return layer._outbound_nodes[0].outbound_layer
+
     @property
-    def last_quantizer_layer(self):
+    def last_quantizer_layer(self) -> 'FixedPointQuantizer':
         """The last quantizer layer in the model. Return None if this is the last quantizer layer."""
-        layer = self.last_layer(self)
+        layer = self.get_last_layer(self)
         while not isinstance(layer, FixedPointQuantizer):
-            layer = self.last_layer(layer)
+            layer = self.get_last_layer(layer)
         return layer
+
+    @property
+    def covered_layers(self) -> list[keras.layers.Layer]:
+        covered_layers = [self.get_last_layer(self)]
+        layer = self.get_next_layer(self)
+        if layer is None:
+            return covered_layers
+        while True:
+            covered_layers.append(layer)
+            next_layer = self.get_next_layer(layer)
+            if next_layer is None:
+                break
+            if isinstance(next_layer, FixedPointQuantizer):
+                break
+            layer = next_layer
+        return covered_layers
 
     @property
     def bit_accurate_accum_t(self):
         """bit accurate accum_t to be used for the intermediate results. If the current layer does not have a weight to determine the quantizer, None is returned."""
-        if self.hls_config is None:
+        last_layer_name = self.get_last_layer(self).name
+
+        if self.overrides is None:
             return None
-        if 'last_layer' not in self.hls_config:
+        if 'layers' not in self.overrides:
             return None
-        if 'weight_t' not in self.hls_config['last_layer']:
+        if last_layer_name not in self.overrides['layers']:
+            return None
+        if 'weight_t' not in self.overrides['layers'][last_layer_name]:
             return None
 
-        assert 'last_layer' in self.hls_config, 'last_layer must be specified in hls_config when FixedPointQuantizer is used following a layer requiring accum_t.'
+        last_layer_conf: dict = self.overrides['layers'][last_layer_name]
 
-        k1, i1, f1 = apf_to_tuple(self.hls_config['last_layer']['weight_t'])
+        assert 'layers' in self.overrides, 'layers must be specified in hls_config when FixedPointQuantizer is used following a layer requiring accum_t.'
+
+        k1, i1, f1 = apf_to_tuple(last_layer_conf['weight_t'])
         k2, i2, f2 = self.last_quantizer_layer.result_t_kif
         k, i, f = self.result_t_kif
         if self.aggressive:
             accum_t = tuple_to_apf((k, i, f1 + f2))
         else:
-            _accum_multiplicity = self.hls_config['last_layer'].get('_accum_multiplicity', 1024)
+            _accum_multiplicity = last_layer_conf.get('_accum_multiplicity', 1024)
             bg_int_bias = int(np.ceil(np.log2(_accum_multiplicity)))
             accum_t = tuple_to_apf((k1 or k2 or k, i1 + i2 + bg_int_bias, f1 + f2))
         return accum_t
 
     @property
+    def accum_t(self):
+        if self.accum_bits_bias is None:
+            return self.bit_accurate_accum_t
+        bit_accurate_acccum_t = self.bit_accurate_accum_t
+        if bit_accurate_acccum_t is None:
+            return None
+        k, i, _ = apf_to_tuple(bit_accurate_acccum_t)
+        _, _, f = self.result_t_kif
+        return tuple_to_apf((k, i, f + self.accum_bits_bias))
+
+    @property
     def bit_accurate_table_t_and_table_size(self):
         """Return bit-accurate table_t and table_size to be used for the last Activation layer. If the last layer is not Activation, None is returned. If softmax is used, fixed<18,8,RND,SAT> is returned for table_t (not used) and table_size is computed as usual."""
-        if not isinstance(last_layer := self.last_layer(self), keras.layers.Activation):
+        if not isinstance(layers := self.get_last_layer(self), keras.layers.Activation):
             return None
-        activation = last_layer.activation
+        activation = layers.activation
         if activation is keras.activations.softmax:
             table_t = 'fixed<18,8,RND,SAT>'
         else:
-            table_t = self.result_t
-        k, i, f = self.result_t_kif
+            k, i, f = apf_to_tuple(self.result_t_last)
+            if self.removable:
+                table_t = tuple_to_apf((k, i, f), self.TRN, self.SAT)
+            else:
+                table_t = tuple_to_apf((k, i, f), 'TRN', self.SAT)
         if activation is tf.keras.activations.sigmoid:
             table_size = int(16 / 2.**-f)  # LUT Range hardcoded to -8 ~ 8, match #fractional bits
         elif activation is tf.keras.activations.tanh:
             table_size = int(8 / 2.**-f)  # LUT Range hardcoded to -4 ~ 4, match #fractional bits
         else:
             table_size = 2**(k + i + f)
-        return table_t, table_size
+        return table_t, int(table_size)
 
     @property
-    def delete_me(self):
+    def removable(self):
         """Delete this quantizer if no heterogeneity is detected."""
         if np.prod(self.bits.shape) == 1:
             return True
@@ -255,15 +319,27 @@ class FixedPointQuantizer(keras.layers.Layer):
         conf['RND'] = self.RND
         conf['SAT'] = self.SAT
         conf['shape'] = tuple(self.bits.shape)
-        hls_config = self.hls_config or {'last_layer': {}}
-        hls_config['last_layer']['result_t'] = self.result_t
-        if accum_t := self.bit_accurate_accum_t:
-            hls_config['last_layer']['accum_t'] = accum_t
-            hls_config['last_layer']['bias_t'] = accum_t
+        overrides = self.overrides or {'layers': {}}
+
+        # Set result_t. For last layer, special consideration is made based on if this layer will be removed before synth, RND, WRAP, etc...
+        result_t = self.result_t
+        result_t_last = self.result_t_last
+        covered_layers = self.covered_layers
+        overrides['layers'].setdefault(covered_layers[0].name, {})['result_t'] = result_t_last
+        for layer in self.covered_layers[1:]:
+            overrides['layers'].setdefault(layer.name, {})['result_t'] = result_t
+        overrides['layers'][self.name] = {'result_t': result_t}
+
+        # Set accum_t, table_t, and table_size when applicable. accum_t is only assume for last_layer with weight_t specified.
+        last_layer_name = self.get_last_layer(self).name
+        last_layer_config = overrides['layers'][last_layer_name]
+        if accum_t := self.accum_t:
+            last_layer_config['accum_t'] = accum_t
+            last_layer_config['bias_t'] = accum_t
         if table_t_and_size := self.bit_accurate_table_t_and_table_size:
-            hls_config['last_layer']['table_t'], hls_config['last_layer']['table_size'] = table_t_and_size
-        hls_config['last_layer']['name'] = self.name.replace('_quantizer', '')
-        conf['hls_config'] = hls_config
+            last_layer_config['table_t'], last_layer_config['table_size'] = table_t_and_size
+        conf['overrides'] = overrides
+        conf['removable'] = self.removable
         return conf
 
     @classmethod
@@ -272,4 +348,5 @@ class FixedPointQuantizer(keras.layers.Layer):
         keep_negative = K.variable(dummy_v, dtype='int8', name='keep_negative')
         bits = K.variable(dummy_v, dtype='int8', name='bits')
         integers = K.variable(dummy_v, dtype='int8', name='integers')
+        config.pop('removable', None)
         return cls(keep_negative, bits, integers, **config)
