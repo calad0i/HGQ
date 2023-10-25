@@ -226,16 +226,17 @@ class FixedPointQuantizer(keras.layers.Layer):
 
     @property
     def covered_layers(self) -> list[keras.layers.Layer]:
+        """Cover the last layer immediately before this quantizer, all all layers after it until second last (inclusive) layer to the next quantizer, or end of model."""
         covered_layers = [self.get_last_layer(self)]
         layer = self.get_next_layer(self)
         if layer is None:
             return covered_layers
         while True:
-            covered_layers.append(layer)
             next_layer = self.get_next_layer(layer)
-            if next_layer is None:
-                break
             if isinstance(next_layer, FixedPointQuantizer):
+                break
+            covered_layers.append(layer)
+            if next_layer is None:
                 break
             layer = next_layer
         return covered_layers
