@@ -282,24 +282,28 @@ class FixedPointQuantizer(keras.layers.Layer):
 
     @property
     def bit_accurate_table_t_and_table_size(self):
-        """Return bit-accurate table_t and table_size to be used for the last Activation layer. If the last layer is not Activation, None is returned. If softmax is used, fixed<18,8,RND,SAT> is returned for table_t (not used) and table_size is computed as usual."""
+        """Return bit-accurate table_t and table_size to be used for the last Activation layer. If the last layer is not Activation, None is returned. If softmax is used, as table_t is not used, None is returned."""
         if not isinstance(layers := self.get_last_layer(self), keras.layers.Activation):
             return None
         activation = layers.activation
         if activation is keras.activations.softmax:
-            table_t = 'fixed<18,8,RND,SAT>'
+            return None
         else:
             k, i, f = apf_to_tuple(self.result_t_last)
             if self.removable:
-                table_t = tuple_to_apf((k, i, f), self.TRN, self.SAT)
+                table_t = tuple_to_apf((k, i, f), self.RND, self.SAT)
             else:
-                table_t = tuple_to_apf((k, i, f), 'TRN', self.SAT)
+                if self.RND == 'TRN':
+                    table_t = tuple_to_apf((k, i, f), 'TRN', self.SAT)
+                else:
+                    table_t = tuple_to_apf((k, i, f + 1), 'TRN', self.SAT)
+        inp_k, inp_i, inp_f = self.last_quantizer_layer.result_t_kif
         if activation is tf.keras.activations.sigmoid:
-            table_size = int(16 / 2.**-f)  # LUT Range hardcoded to -8 ~ 8, match #fractional bits
+            table_size = int(16 / 2.**-inp_f)  # LUT Range hardcoded to -8 ~ 8, match #fractional bits
         elif activation is tf.keras.activations.tanh:
-            table_size = int(8 / 2.**-f)  # LUT Range hardcoded to -4 ~ 4, match #fractional bits
+            table_size = int(8 / 2.**-inp_f)  # LUT Range hardcoded to -4 ~ 4, match #fractional bits
         else:
-            table_size = 2**(k + i + f)
+            table_size = 2**(inp_k + inp_i + inp_f)
         return table_t, int(table_size)
 
     @property
