@@ -6,6 +6,7 @@ from keras.layers.convolutional.base_conv import Conv as BaseConv
 
 from .fixed_point_quantizer import FixedPointQuantizer
 from ..layers import HLayerBase, PLayerBase, Signature
+from ..layers import PDropout
 from ..utils import warn
 
 
@@ -158,10 +159,10 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', agg
         RND = 'TRN'
     k, b, i = kn, kn + int_bits + fp_bits, kn + int_bits
     relu_quantizer = FixedPointQuantizer(k, b, i, RND, SAT, name=f'{name}_relu_quantizer')
-    
+
     if isinstance(layer, keras.layers.Activation):
         return relu_quantizer,
-    
+
     k, i, f = tf.reduce_max(kn, keepdims=True), tf.reduce_max(int_bits, keepdims=True), tf.reduce_max(fp_bits, keepdims=True)
     k, b, i = k, k + i + f, k + i
 
@@ -174,7 +175,12 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', agg
     return layer_quantizer, relu_quantizer
 
 
+SKIP_LAYERS = (PDropout,)
+
+
 def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = None, SAT='WRAP', aggressive: bool = True, accum_bits_bias=None):
+    if isinstance(layer, SKIP_LAYERS):
+        return tensor
     if namer is not None:
         name = namer.next_name(layer.name)
     else:

@@ -163,3 +163,6 @@ PMaxPool2D = PMaxPooling2D
 PAvgPool2D = PAveragePooling2D
 PMaxPool1D = PMaxPooling1D
 PAvgPool1D = PAveragePooling1D
+
+class PDropout(PLayerBase, tf.keras.layers.Dropout):
+    pass
