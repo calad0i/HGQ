@@ -138,6 +138,10 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', agg
             warn(f'Unknown layer type {layer.__class__.__name__} to compute accumlation multiplicity for bitgrowth. If you are not using bitgrowth, ignore this warning.')
         overriddes = {'layers': {name: {'weight_t': layer.ker_container, '_accum_multiplicity': multiplicity}}}
 
+        if hasattr(layer, 'parallel_factor'):
+            parallel_factor = int(layer.parallel_factor)
+            overriddes['layers'][name]['parallelization_factor'] = parallel_factor
+
     int_bits, fp_bits, kn = quantizer.get_bits_exact(pos_only=False)  # type: ignore
     if quantizer.rnd_strategy != 3 and not layer.can_bias_cover_rnd:
         RND = 'RND'
@@ -148,6 +152,16 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', agg
         k, b, i = kn, kn + int_bits + fp_bits, kn + int_bits
         return FixedPointQuantizer(k, b, i, RND, SAT, name=f'{name}_quantizer', overrides=overriddes, aggressive=aggressive, accum_bits_bias=accum_bits_bias),
 
+    if quantizer.rnd_strategy != 3 and not layer.can_bias_cover_rnd:
+        RND = 'RND'
+    else:
+        RND = 'TRN'
+    k, b, i = kn, kn + int_bits + fp_bits, kn + int_bits
+    relu_quantizer = FixedPointQuantizer(k, b, i, RND, SAT, name=f'{name}_relu_quantizer')
+    
+    if isinstance(layer, keras.layers.Activation):
+        return relu_quantizer,
+    
     k, i, f = tf.reduce_max(kn, keepdims=True), tf.reduce_max(int_bits, keepdims=True), tf.reduce_max(fp_bits, keepdims=True)
     k, b, i = k, k + i + f, k + i
 
@@ -156,12 +170,6 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', agg
         b += 1
     layer_quantizer = FixedPointQuantizer(k, b, i, 'TRN', SAT, name=f'{name}_quantizer', overrides=overriddes, aggressive=aggressive, accum_bits_bias=accum_bits_bias)
     int_bits, fp_bits, kn = quantizer.get_bits_exact(pos_only=True)  # type: ignore
-    if quantizer.rnd_strategy != 3 and not layer.can_bias_cover_rnd:
-        RND = 'RND'
-    else:
-        RND = 'TRN'
-    k, b, i = kn, kn + int_bits + fp_bits, kn + int_bits
-    relu_quantizer = FixedPointQuantizer(k, b, i, RND, SAT, name=f'{name}_relu_quantizer')
 
     return layer_quantizer, relu_quantizer
 
