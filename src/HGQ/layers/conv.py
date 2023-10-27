@@ -1,5 +1,6 @@
 import tensorflow as tf
-from keras.layers.convolutional.base_conv import Conv
+from keras.src.layers.convolutional.base_conv import Conv
+from keras.saving import register_keras_serializable
 
 from .base import HLayerBase
 from ..utils import warn
@@ -132,7 +133,7 @@ class HConv(HLayerBase, Conv):
         self.bops.assign(tf.constant(bops, dtype=tf.float32))
         return bops
 
-
+@register_keras_serializable(package="HGQ")
 class HConv2D(HConv):
     def __init__(
         self,
@@ -188,6 +189,7 @@ class HConv2D(HConv):
         )
 
 
+@register_keras_serializable(package="HGQ")
 class HConv1D(HConv):
     def __init__(
         self,

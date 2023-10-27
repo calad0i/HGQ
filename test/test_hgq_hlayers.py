@@ -12,7 +12,6 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 import tensorflow as tf
 tf.get_logger().setLevel('ERROR')
 from tensorflow import keras
-from keras.layers.merging.base_merge import _Merge
 
 test_root_path = Path(__file__).parent
 test_root_path = Path('/tmp/unit_test')

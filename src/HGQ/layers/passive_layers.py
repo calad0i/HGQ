@@ -1,13 +1,15 @@
 import numpy as np
 import tensorflow as tf
 
-from keras.layers.pooling.base_pooling2d import Pooling2D
-from keras.layers.pooling.base_pooling1d import Pooling1D
-from keras.utils import conv_utils
+from keras.src.layers.pooling.base_pooling2d import Pooling2D
+from keras.src.layers.pooling.base_pooling1d import Pooling1D
+from keras.src.utils import conv_utils
+from keras.saving import register_keras_serializable
 
 from ..utils import apf_to_tuple, tuple_to_apf
 
 
+@register_keras_serializable(package="HGQ")
 class PLayerBase(tf.keras.layers.Layer):
 
     def __init__(self, *args, **kwargs):
@@ -40,6 +42,7 @@ class PLayerBase(tf.keras.layers.Layer):
         return self.act_container
 
 
+@register_keras_serializable(package="HGQ")
 class Signature(PLayerBase):
 
     def __init__(self, keep_negative, bits, int_bits, **kwargs):
@@ -84,14 +87,17 @@ class Signature(PLayerBase):
         }
 
 
+@register_keras_serializable(package="HGQ")
 class PReshape(tf.keras.layers.Reshape, PLayerBase):
     pass
 
 
+@register_keras_serializable(package="HGQ")
 class PFlatten(tf.keras.layers.Flatten, PLayerBase):
     pass
 
 
+@register_keras_serializable(package="HGQ")
 class PConcatenate(tf.keras.layers.Concatenate, PLayerBase):
 
     @property
@@ -119,6 +125,7 @@ class PConcatenate(tf.keras.layers.Concatenate, PLayerBase):
         return container
 
 
+@register_keras_serializable(package="HGQ")
 class PPool2D(PLayerBase, Pooling2D):
 
     def build(self, input_shape):
@@ -131,6 +138,7 @@ class PPool2D(PLayerBase, Pooling2D):
         return tf.nn.max_pool2d(act_bw, ksize=self.pool_size, strides=self.strides, padding=self.padding.upper(), data_format=self._tf_data_format)
 
 
+@register_keras_serializable(package="HGQ")
 class PPool1D(PLayerBase, Pooling1D):
 
     def build(self, input_shape):
@@ -143,18 +151,22 @@ class PPool1D(PLayerBase, Pooling1D):
         return tf.nn.max_pool1d(act_bw, ksize=self.pool_size, strides=self.strides, padding=self.padding.upper(), data_format=self._tf_data_format)
 
 
+@register_keras_serializable(package="HGQ")
 class PMaxPooling2D(PPool2D, tf.keras.layers.MaxPool2D):
     pass
 
 
+@register_keras_serializable(package="HGQ")
 class PAveragePooling2D(PPool2D, tf.keras.layers.AvgPool2D):
     pass
 
 
+@register_keras_serializable(package="HGQ")
 class PMaxPooling1D(PPool1D, tf.keras.layers.MaxPool1D):
     pass
 
 
+@register_keras_serializable(package="HGQ")
 class PAveragePooling1D(PPool1D, tf.keras.layers.AvgPool1D):
     pass
 
@@ -164,5 +176,6 @@ PAvgPool2D = PAveragePooling2D
 PMaxPool1D = PMaxPooling1D
 PAvgPool1D = PAveragePooling1D
 
+@register_keras_serializable(package="HGQ")
 class PDropout(PLayerBase, tf.keras.layers.Dropout):
     pass

@@ -4,10 +4,12 @@ import tensorflow as tf
 from ..layers.base import HLayerBase
 from ..utils import apf_to_tuple, tuple_to_apf
 
-from keras.layers.merging.base_merge import _Merge
+from keras.saving import register_keras_serializable
+from keras.src.layers.merging.base_merge import _Merge
 from keras import activations
+from tensorflow.python.ops.nn_ops import relu6, leaky_relu
 
-
+@register_keras_serializable(package="HGQ")
 class HQuantize(HLayerBase):
     def __init__(self, pre_activation_quantizer_config=None, beta=0., **kwargs):
         super().__init__(
@@ -24,6 +26,7 @@ class HQuantize(HLayerBase):
         return input_shape
 
 
+@register_keras_serializable(package="HGQ")
 class HActivation(HLayerBase, tf.keras.layers.Activation):
     def __init__(self, activation, beta=0., pre_activation_quantizer_config=None, **kwargs):
         super().__init__(activation=activation, beta=beta, pre_activation_quantizer_config=pre_activation_quantizer_config, **kwargs)
@@ -36,7 +39,8 @@ class HActivation(HLayerBase, tf.keras.layers.Activation):
             # Jit when using standard round. Very unlikely to have errors.
             self.forward: Callable = tf.function(jit_compile=True)(self.__forward)  # type: ignore
             
-        elif self.activation in (activations.relu, activations.linear, activations.relu6, activations.leaky_relu):
+        elif self.activation in (activations.relu, activations.linear, relu6, leaky_relu):
+            # tf 213 scatters everthing around. Terrible design choice.
             # Jit when activation is more or less linear.
             self.forward: Callable = tf.function(jit_compile=True)(self.__forward)  # type: ignore
     
@@ -60,6 +64,7 @@ class HActivation(HLayerBase, tf.keras.layers.Activation):
         return 'ap_fixed<18,8,AP_RND>'  # No bit-match for softmax anyway, just maxout it for now.
 
 
+@register_keras_serializable(package="HGQ")
 class HAdd(HLayerBase, _Merge):
 
     @tf.function(jit_compile=True)

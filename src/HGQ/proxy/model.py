@@ -1,8 +1,8 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from keras.engine.node import Node
-from keras.layers.convolutional.base_conv import Conv as BaseConv
+from keras.src.engine.node import Node
+from keras.src.layers.convolutional.base_conv import Conv as BaseConv
 
 from .fixed_point_quantizer import FixedPointQuantizer
 from ..layers import HLayerBase, PLayerBase, Signature

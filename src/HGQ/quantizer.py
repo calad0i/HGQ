@@ -55,7 +55,7 @@ class HGQ:
         self.minmax_record = minmax_record
         """bool: Whether to record min and max of quantized values."""
         self.built = False
-        self.degeneracy = 1
+        self.degeneracy = 1.
         """Degeneracy of the quantizer. Records how many values are mapped to the same quantizer."""
 
     def _compute_bw_shape_and_degeneracy(self, input_shape):

@@ -1,8 +1,10 @@
 import numpy as np
 import tensorflow as tf
+from keras.saving import register_keras_serializable
 
-from .base import HLayerBase, scale_grad
+from .base import HLayerBase
 
+@register_keras_serializable(package="HGQ")
 class HDense(HLayerBase, tf.keras.layers.Dense):
     def __init__(
         self,
