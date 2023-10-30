@@ -206,91 +206,10 @@ class HLayerBase(tf.keras.layers.Layer):
         return np.float32(0.)
 
     @property
-    def result_container(self) -> str:
-        """Returns the ap representation of the quantizers as a string."""
-        int_bits, fp_bits, kn = self.pre_activation_quantizer.get_bits_exact(pos_only=False)  # type: ignore
-        int_bits, fp_bits, kn = int_bits.ravel(), fp_bits.ravel(), kn.ravel()
-        mask = self.act_bw.numpy() > 0  # type: ignore
-        if skip_dims := self.pre_activation_quantizer.skip_dims:
-            mask = np.any(mask, axis=tuple(skip_dims)).ravel()
-        if int_bits[mask].size > 1:
-            int_max, fp_max, kn_max = int_bits[mask].max(), fp_bits[mask].max(), kn[mask].max()
-        else:
-            int_max, fp_max, kn_max = int_bits[mask].item(), fp_bits[mask].item(), kn[mask].item()
-
-        assert np.sum(kn[int_bits + fp_bits <= 0]
-                      ) == 0, f'Bit counting error at {self.name}. Did you forget to call `compute_bops` before passing the model to converter? Or, please try again with cuda disabled (2^13 or above will may in error when tensorflow is run with cuda. If not, this should never happen. Please open an issue at https://github.com/calad0i/HGQ'
-        
-        if np.prod(self.pre_activation_quantizer.fbw.shape) > 1:
-            # Is in io_parallel mode, 
-            if self.pre_activation_quantizer.rnd_strategy != 3 and not self.can_bias_cover_rnd:
-                # Using standard round and has no bias term to emulate the rounding
-                fp_max += 1
-            return tuple_to_apf((kn_max, int_max, fp_max))
-        else:
-            # No need to do 2-stage processing, just round the result if needed
-            if self.pre_activation_quantizer.rnd_strategy != 3 and not self.can_bias_cover_rnd:
-                rnd = 'AP_RND'
-            else:
-                rnd = 'AP_TRN'
-            return tuple_to_apf((kn_max, int_max, fp_max), rnd=rnd)
-
-    @property
     def last_layer(self):
         assert len(self._inbound_nodes) ==1, f'input_container is only available for layers used only once. {self.name} is used {len(self._inbound_nodes)} times.'
         assert not isinstance(self._inbound_nodes[0].inbound_layers, list), f'input_container is only available for layers with a single input. {self.name} has {len(self._inbound_nodes[0].inbound_layers)} inputs.'
         return self._inbound_nodes[0].inbound_layers
-
-    @property
-    def input_container(self):
-        try:
-            return self.last_layer.result_container
-        except ValueError:
-            return None
-
-    @property
-    def max_accum_fp_bits(self):
-        ker_fp = apf_to_tuple(self.ker_container)[2]
-        input_container = self.input_container
-        assert input_container is not None, f'input_container is not available for {self.name}.'
-        inp_fp = apf_to_tuple(input_container)[2]
-        fp = inp_fp + ker_fp
-        if self.pre_activation_quantizer.rnd_strategy != 3:
-            fp = max(fp, 1)
-        return fp
-
-    @property
-    def act_container(self) -> str:
-        """Returns the minimal ap representation of the pre-activation quantizer that can represnet all values it have seen."""
-        if not self._relu_act:
-            return self.result_container
-
-        int_bits, fp_bits, _ = self.pre_activation_quantizer.get_bits_exact(pos_only=True)  # type: ignore
-        mask = int_bits + fp_bits > 0
-        int_max, fp_max = int_bits[mask].max(), fp_bits[mask].max()
-
-        if np.prod(self.pre_activation_quantizer.fbw.shape) > 1: # ==1 means no mask should be applied
-            if self.pre_activation_quantizer.rnd_strategy != 3 and not self.can_bias_cover_rnd:
-                fp_max += 1
-            fixed = tuple_to_apf((0, int_max, fp_max))
-        else:
-            if self.pre_activation_quantizer.rnd_strategy != 3 and not self.can_bias_cover_rnd:
-                rnd = 'RND'
-            else:
-                rnd = 'TRN'
-            fixed = tuple_to_apf((0, int_max, fp_max), rnd=rnd)
-        assert fixed != 'nuke', f'{self.name} has no non-zero activation bits. Please check your model.'
-        return fixed
-
-    @property
-    def ker_container(self):
-        """Returns the minimal ap representation of the kernel quantizer that can represent every value."""
-        int_bits, fp_bits, kn = self.kernel_quantizer.get_bits_exact(self.kernel)
-        mask = int_bits + fp_bits > 0
-        assert np.sum(
-            kn[~mask]) == 0, f'Bit counting error at {self.name}. Please try again with cuda disabled (2^13 or above will may in error when tensorflow is run with cuda. If not, this should never happen. Please open an issue at https://github.com/calad0i/HGQ'
-        int_max, fp_max, kn_max = int_bits[mask].max(), fp_bits[mask].max(), kn[mask].max()
-        return tuple_to_apf((kn_max, int_max, fp_max))
 
     def get_config(self):
         base_config = super().get_config()

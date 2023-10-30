@@ -1,15 +1,17 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
 import pytest
 
 import random
 from pathlib import Path
 import numpy as np
 
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 import tensorflow as tf
 tf.get_logger().setLevel('ERROR')
 from tensorflow import keras
+import hls4ml
 
 test_root_path = Path(__file__).parent
 test_root_path = Path('/tmp/unit_test')
@@ -45,7 +47,7 @@ def create_model(rnd_strategy:str, io_type:str):
         PMaxPool2D(2), # 4x4x2
         PReshape((8,4)), # 8x4
         HConv1D(4, 3, activation='relu'), # 6x4
-        PMaxPool1D(2), # 3x4    2
+        PMaxPool1D(2), # 3x4    2mismatch_proxy = r_keras != r_proxy
         PFlatten(), # 12
         HDense(10), # 10
         HActivation('sigmoid')
@@ -72,20 +74,43 @@ def get_data(N:int, sigma:float, max_scale:float):
 @pytest.mark.parametrize("N", [10, 50000])
 @pytest.mark.parametrize("rnd_strategy", ['auto', 'standard_round', 'floor'])
 @pytest.mark.parametrize("io_type", ['io_parallel','io_stream'])
-def test_end2end(N:int, rnd_strategy:str, io_type:str):
+@pytest.mark.parametrize("cover_factor", [0.49, 1.0])
+@pytest.mark.parametrize("aggressive", [True, False])
+@pytest.mark.parametrize("backend", ['vivado', 'vitis'])
+def test_end2end(N:int, rnd_strategy:str, io_type:str, cover_factor:float, aggressive:bool, backend:str):
     model = create_model(rnd_strategy=rnd_strategy, io_type=io_type)
     data = get_data(N, 1, 3)
-    trace_minmax(model, data, cover_factor=1.0)
-    r_keras = model.predict(data[1:2], verbose=0) # type: ignore
+    trace_minmax(model, data, cover_factor=cover_factor)
+    r_keras = model.predict(data, verbose=0) # type: ignore
     print(f"Testing {rnd_strategy}_{io_type}")
-    proxy = generate_proxy_model(model)
+    proxy = generate_proxy_model(model, aggressive=aggressive)
     model.save(test_root_path / f'hls4ml_prj_hgq_{N}_{rnd_strategy}_{io_type}.h5')
     proxy.save(test_root_path / f'hls4ml_prj_hgq_{N}_{rnd_strategy}_{io_type}_proxy.h5')
-    r_hls = proxy.predict(data[1:2], verbose=0) # type: ignore
+    output_dir=str(test_root_path / f'hls4ml_prj_hgq_{N}_{rnd_strategy}_{io_type}_overflow={cover_factor<1}_SAT={not aggressive}_{backend}')
+    r_proxy = proxy.predict(data, verbose=0) # type: ignore
 
-    mismatch = r_keras != r_hls
-    assert np.sum(mismatch)==0, f"Results do not match: {np.sum(np.any(mismatch,axis=1))} out of {N} samples are different. Sample: {r_keras[mismatch].ravel()[:10]} vs {r_hls[mismatch].ravel()[:10]}"
+    mismatch_proxy = r_keras != r_proxy
+    if cover_factor >= 1.0:
+        assert np.sum(mismatch_proxy)==0, f"Proxy-Keras mismatch: {np.sum(np.any(mismatch_proxy,axis=1))} out of {N} samples are different. Sample: {r_keras[mismatch_proxy].ravel()[:5]} vs {r_proxy[mismatch_proxy].ravel()[:5]}"
+    else:
+        assert np.sum(mismatch_proxy)>0, f"Proxy-Keras perfect match when overflow should happen: cover_factor={cover_factor}."
 
+    hls_config = {'LayerName':{}}
+    for layer in proxy.layers:
+        name = layer.name
+        hls_config['LayerName'][name] = {'Trace': True, 'IOType':io_type, 'Backend':backend}
+
+    model_hls = hls4ml.converters.convert_from_keras_model(proxy, hls_config=hls_config, output_dir=output_dir)
+    
+    hls_trace = model_hls.trace(data)[1]
+    keras_trace = hls4ml.model.profiling.get_ymodel_keras(proxy, data)
+    for k in hls_trace.keys():
+        if 'quantizer' not in k:
+            continue
+        v_k, v_h = hls_trace[k], keras_trace[k]
+        trace_mismatch = np.all(v_k != v_h)
+        assert np.sum(trace_mismatch)==0, f"Trace mismatch for {k}: {np.sum(trace_mismatch)} out of {N} samples are different. Sample: {v_k[trace_mismatch].ravel()[:5]} vs {v_h[trace_mismatch].ravel()[:5]}"
+        
 if __name__ == '__main__':
-    test_end2end(10, 'standard_round', 'io_parallel')
+    test_end2end(10, 'standard_round', 'io_parallel', 0.49, True, 'vivado')
     

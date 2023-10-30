@@ -5,8 +5,8 @@ from keras.src.engine.node import Node
 from keras.src.layers.convolutional.base_conv import Conv as BaseConv
 
 from .fixed_point_quantizer import FixedPointQuantizer
-from ..layers import HLayerBase, PLayerBase, Signature
-from ..layers import PDropout
+from ..layers import HLayerBase, PLayerBase, Signature, PDropout
+from .precision_derivation import register_qconf
 from ..utils import warn
 
 
@@ -137,7 +137,7 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', agg
         else:
             multiplicity = 1024
             warn(f'Unknown layer type {layer.__class__.__name__} to compute accumlation multiplicity for bitgrowth. If you are not using bitgrowth, ignore this warning.')
-        overriddes = {'layers': {name: {'weight_t': layer.ker_container, '_accum_multiplicity': multiplicity}}}
+        overriddes = {'layers': {name: {'_accum_multiplicity': multiplicity}}}
 
         if hasattr(layer, 'parallel_factor'):
             parallel_factor = int(layer.parallel_factor)
@@ -157,7 +157,7 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', agg
         RND = 'RND'
     else:
         RND = 'TRN'
-    k, b, i = kn, kn + int_bits + fp_bits, kn + int_bits
+    k, b, i = np.zeros_like(kn), int_bits + fp_bits, int_bits
     relu_quantizer = FixedPointQuantizer(k, b, i, RND, SAT, name=f'{name}_relu_quantizer')
 
     if isinstance(layer, keras.layers.Activation):
@@ -166,9 +166,12 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', agg
     k, i, f = tf.reduce_max(kn, keepdims=True), tf.reduce_max(int_bits, keepdims=True), tf.reduce_max(fp_bits, keepdims=True)
     k, b, i = k, k + i + f, k + i
 
-    # If there is a rounding following the layer, keep one extra bit and do NOT round perserve bit accuracy.
-    if RND != 'TRN':
+    # If there is a rounding following the layer, keep one or two extra bit and do NOT round perserve bit accuracy.
+    if RND == 'RND':
         b += 1
+    elif RND != 'TRN':
+        b += 2
+
     layer_quantizer = FixedPointQuantizer(k, b, i, 'TRN', SAT, name=f'{name}_quantizer', overrides=overriddes, aggressive=aggressive, accum_bits_bias=accum_bits_bias)
     int_bits, fp_bits, kn = quantizer.get_bits_exact(pos_only=True)  # type: ignore
 
@@ -244,4 +247,7 @@ def generate_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits
         outputs = outputs[0]
     if len(inputs) == 1:
         inputs = inputs[0]
-    return keras.Model(inputs=inputs, outputs=outputs)
+    model = keras.Model(inputs=inputs, outputs=outputs)
+    for layer in model.layers:
+        register_qconf(layer)
+    return model

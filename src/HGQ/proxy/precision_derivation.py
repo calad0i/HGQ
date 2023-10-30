@@ -216,3 +216,42 @@ def get_config(layer:keras.layers.Layer, bias_accum_fp:None|int=None):
         result_t = tuple_to_apf((k,i,f), RND, SAT)
         conf = {'result_t':result_t}
     return conf
+
+
+def _get_next_quantizer(layer:keras.layers.Layer):
+    out_layers = [node.outbound_layer for node in layer._outbound_nodes]
+    for out_layer in out_layers:
+        if isinstance(out_layer, FixedPointQuantizer):
+            return out_layer
+        r = _get_next_quantizer(out_layer)
+        if r is not None:
+            return r
+    return None
+
+def _get_last_quantizer(layer:keras.layers.Layer): 
+    assert len(layer._inbound_nodes) <= 1, f'Layer {layer.name} has more than one inbound nodes. This is not supported.'
+    in_layers = layer._inbound_nodes[0].inbound_layers
+    if not isinstance(in_layers, list):
+        in_layers = [in_layers]
+    for in_layer in in_layers:
+        if isinstance(in_layer, FixedPointQuantizer):
+            return in_layer
+        r = _get_last_quantizer(in_layer)
+        if r is not None:
+            return r
+    return None
+
+def get_whatever_quantizer(layer:keras.layers.Layer):
+    if isinstance(layer, FixedPointQuantizer):
+        return layer
+    if isinstance(layer, keras.layers.InputLayer):
+        pass      
+    q = _get_next_quantizer(layer) or _get_last_quantizer(layer)
+    assert q is not None, f'Layer {layer.name} has no quantizer before or after it. Did you create a valid proxy model?'
+    return q
+
+def register_qconf(layer:keras.layers.Layer):
+    q = get_whatever_quantizer(layer)
+    conf = get_config(layer)
+    overrides = q.overrides or {}
+    overrides['layers'].setdefault(layer.name, {}).update(conf)

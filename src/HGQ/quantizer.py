@@ -36,6 +36,20 @@ def q_round(x: tf.Tensor, strategy: int = 0):
         return tf.floor(x)
     raise ValueError(f"Unknown strategy {strategy}")
 
+def get_arr_bits(arr:np.ndarray):
+    kn = (arr < 0).astype(np.int8)
+    """Internal helper function to compute the position of the highest and lowest bit of an array of fixed-point integers."""
+    mul = 32  # type: ignore
+    arr = arr * 2**mul
+    arr = np.abs(arr)[..., None]  # type: ignore
+    n = int(np.ceil(np.max(np.log2(arr + 1))))  # type: ignore
+    divisor = 2**np.arange(1, n)[None, ...]  # type: ignore
+    low_pos = np.sum(arr % divisor == 0, axis=-1) + (arr[..., 0] == 1)
+    with np.errstate(divide='ignore'):
+        high_pos = np.where(arr[..., 0] != 0, np.floor(np.log2(arr[..., 0]) + 1), low_pos).astype(np.int8)
+    fb = 32 - low_pos
+    int_bits = high_pos - low_pos - fb
+    return kn.astype(np.int8), int_bits.astype(np.int8), fb.astype(np.int8)
 
 class HGQ:
     def __init__(self, init_bw: float, skip_dims, rnd_strategy: str | int = 'floor', exact_q_value=True, dtype=None, bw_clip=(-23, 23), trainable=True, regularizer=None, minmax_record=False):
@@ -100,7 +114,9 @@ class HGQ:
         _input_shape, degeneracy = self._compute_bw_shape_and_degeneracy(input_shape)
         self.degeneracy = degeneracy
 
-        self.fbw = tf.Variable(tf.ones(_input_shape) * self.init_bw, trainable=self.trainable, name=name, dtype=tf.float32)
+        self.fbw = tf.Variable(
+            tf.ones(_input_shape) * self.init_bw, trainable=self.trainable, name=name, dtype=tf.float32
+        )
 
         self.init_minmax()
 
@@ -232,24 +248,8 @@ class HGQ:
 
         assert ref is not None
         w = self.forward(ref).numpy()  # type: ignore
-        kn = (w < 0).astype(np.int8)
-        high, low = self._get_arr_bits(w)
-        fb = int(max(*self.bw_clip)) + 2 - low  # type: ignore
-        int_bits = high - low - fb
-        return int_bits.astype(np.int8), fb.astype(np.int8), kn.astype(np.int8)
-
-    def _get_arr_bits(self, k: np.ndarray):
-        """Internal helper function to compute the position of the highest and lowest bit of an array of fixed-point integers."""
-        mul = int(max(*self.bw_clip)) + 2  # type: ignore
-        k = k * 2**mul
-        k = np.abs(k)[..., None]  # type: ignore
-        n = int(np.ceil(np.max(np.log2(k + 1))))  # type: ignore
-        divisor = 2**np.arange(1, n)[None, ...]  # type: ignore
-        low_pos = np.sum(k % divisor == 0, axis=-1) + (k[..., 0] == 1)
-        with np.errstate(divide='ignore'):
-            high_pos = np.where(k[..., 0] != 0, np.floor(np.log2(k[..., 0]) + 1), low_pos).astype(np.int8)
-        # print(high_pos, low_pos)
-        return high_pos.astype(np.int8), low_pos.astype(np.int8)
+        k,i,f = get_arr_bits(w)
+        return i,f,k
 
     def adapt_bw_bits(self, ref: tf.Tensor):
         """Adapt the bitwidth of the quantizer to the input tensor, such that each input is represented with approximately the same number of bits. (i.e., 1.5 with be represented by ap_fixed<2,1> and 0.375 will be represented by ap_fixed<2,-2>)."""
