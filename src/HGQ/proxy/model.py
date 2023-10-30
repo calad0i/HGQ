@@ -31,13 +31,14 @@ def solve_dependencies(model: keras.Model):
 
     nodes = get_all_nodes(model)
 
-    dependencies_list: list[tuple[keras.layers.Layer, set[Node], Node]] = []
+    dependencies_list: list[tuple[keras.layers.Layer, list[Node], Node]] = []
+    "List of (layer, requires, provides) tuples; requires is a list of nodes, provides is a single node."
 
     for node in nodes:
         if node.is_input:
             continue
         layer = node.layer
-        requires = set(node.parent_nodes)
+        requires = list(node.parent_nodes)
         provides = node
         dependencies_list.append((layer, requires, provides))
     return input_nodes, output_nodes, dependencies_list
@@ -229,7 +230,7 @@ def generate_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits
         SAT = 'SAT'
     while dependencies_list and not len(outputs) == nof_output:
         layer, requires, provides = dependencies_list.pop(0)
-        if requires.issubset(satisfied):
+        if set(requires).issubset(satisfied):
             inps = [satisfied[node] for node in requires]
             if len(inps) == 1:
                 inps = inps[0]
