@@ -2,6 +2,7 @@ import re
 import sys
 
 import tensorflow as tf
+from warnings import warn as _warn
 
 
 class L1:
@@ -136,6 +137,6 @@ def tuple_to_apf(t: tuple, rnd='TRN', warp='WARP', keep_zeros=True):
     return f'{"u" if kn==0 else ""}fixed<{max(i+f+kn,1)},{i+kn}>'
 
 
-def warn(msg):
+def warn(msg: str, stacklevel=1):
     # print in yellow
-    print(f'\033[93m{msg}\033[0m', file=sys.stderr)
+    _warn(f'\033[93m{msg}\033[0m', stacklevel=stacklevel)
