@@ -1,6 +1,7 @@
 import numpy as np
 from tensorflow import keras
 import tensorflow as tf
+from typing import Callable
 from ..utils import warn
 
 from .fixed_point_quantizer import FixedPointQuantizer
@@ -13,6 +14,42 @@ from keras.src.layers.pooling.base_pooling3d import Pooling3D
 from keras.layers import Concatenate, Flatten, Reshape
 
 STREAM = False
+
+def get_arr_container(arr:np.ndarray):
+    """ Get the minimal fixed integer that can represent the array (kif format). If the result is greater than ~30, consider that as inf. (Not representable by fixed point with reasonable bitwidth.)"""
+    k = arr<0
+    lf, hf = -64, 64
+    if np.all(arr==0):
+        warn('All zero array is detected.')
+        return 0,1,0 # All zero array is special. Though, (u)fixed<0,...> will lead to a crash, thus ufixed<1,...> is used.
+    while True:
+        if hf-lf<=1:
+            break
+        f = (lf+hf)//2
+        _arr = arr*2**f
+        if np.all(_arr.astype(np.int64) == _arr):
+            hf = f
+        else:
+            lf = f
+    f = int(hf)
+    with np.errstate(divide='ignore'):
+        i1, i2 = -np.inf, -np.inf
+        if (~k).any():
+            i1 = np.floor(1+np.log2(arr[~k]*2**f)).max()
+        if k.any():
+            i2 = np.ceil(np.log2(-arr[k]*2**f)).max()
+        i = int(max(i1, i2))
+    i-=f
+    k=int(k.any())
+    return k,i,f
+
+def activation_kif_forward(func:Callable, k:int, i:int, f:int):
+    """Given the input bitwidth (kif) of an activation function, get the output bitwidth (kif)."""
+    assert k+i+f>0
+    arr = np.array(np.linspace(-2.**i*k, 2.**i-2.**-f, 2**(k+i+f)), dtype=np.float64)
+    arr:np.ndarray = np.array(func(arr))
+    K,I,F = get_arr_container(arr)
+    return K, I, F
 
 def get_input_kifs(layer:keras.layers.Layer) -> tuple[tuple[int,int,int]|np.ndarray,...]:
     """Get the input bitwidth of a layer, as a tuple of (k, i, f)."""
@@ -41,8 +78,7 @@ def get_produced_kif(layer: keras.layers.Layer|FixedPointQuantizer) -> tuple[int
     if len(kifs) == 1:
         k,i,f = kifs[0]
         if hasattr(layer, 'kernel'):
-            w_k,w_i,w_f = get_arr_bits(layer.kernel.numpy())
-            w_k,w_i,w_f = w_k.max(), w_i.max(), w_f.max()
+            w_k,w_i,w_f = get_arr_container(layer.kernel.numpy())
             k,i,f = int(k or w_k), i+w_i, f+w_f
             if isinstance(layer, keras.layers.Dense):
                 multiplicity = np.prod(layer.kernel.shape) / layer.units
@@ -53,7 +89,8 @@ def get_produced_kif(layer: keras.layers.Layer|FixedPointQuantizer) -> tuple[int
                 warn(f'Layer {layer.name} is not Dense or Conv. Multiplicity for accum size estimation is assumed to be maximum whole size of {multiplicity}.')
             i += int(np.ceil(np.log2(multiplicity)))
         if isinstance(layer, keras.layers.Activation):
-            k,i,f, _, _ = derive_result_kifRS_from_next_quantizers(layer)
+            # k,i,f, R, S = derive_result_kifRS_from_next_quantizers(layer)
+            k,i,f = activation_kif_forward(layer.activation, k,i,f)
     else:
         if isinstance(layer, keras.layers.Add):
             k,i,f = np.max(kifs, axis=0)
@@ -114,6 +151,8 @@ def merge_precision(available:tuple[int,int,int], request:tuple[int,int,int]):
     k = k0
     i = min(i0,i1)
     f = min(f0,f1)
+    if f0>f1 and i0<=i1:
+        i+=1
     return k,i,f
 
 
@@ -154,7 +193,7 @@ def get_result_kifRS(layer:keras.layers.Layer) -> tuple[int, int, int, str, str]
         return result_t
     if isinstance(layer, keras.layers.InputLayer):
         return derive_result_kifRS_from_next_quantizers(layer)
-    if STREAM and hasattr(layer, 'kernel'):
+    if STREAM and (hasattr(layer, 'kernel')):
         return derive_result_kifRS_from_next_quantizers(layer)
     
     produced_kif = get_produced_kif(layer)
@@ -167,8 +206,7 @@ def get_config_wight_accum_result_bias(layer:keras.layers.Layer, bias_accum_fp:N
     assert hasattr(layer, 'kernel'), f'Layer {layer.name} does not have kernel.'
     r_k,r_i,r_f, RND, SAT = get_result_kifRS(layer)
     p_k,p_i,p_f = get_produced_kif(layer)
-    k_k,k_i,k_f = get_arr_bits(layer.kernel.numpy())
-    k_k,k_i,k_f = k_k.max(), k_i.max(), k_f.max()
+    k_k,k_i,k_f = get_arr_container(layer.kernel.numpy())
     weight_t = tuple_to_apf((k_k,k_i,k_f))
     result_t = tuple_to_apf((r_k,r_i,r_f), RND, SAT)
     if bias_accum_fp is None:
