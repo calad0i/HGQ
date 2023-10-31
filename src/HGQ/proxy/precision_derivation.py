@@ -7,6 +7,10 @@ from .fixed_point_quantizer import FixedPointQuantizer
 from ..utils import tuple_to_apf, apf_to_tuple
 from ..quantizer import get_arr_bits
 from keras.src.layers.convolutional.base_conv import Conv
+from keras.src.layers.pooling.base_pooling1d import Pooling1D
+from keras.src.layers.pooling.base_pooling2d import Pooling2D
+from keras.src.layers.pooling.base_pooling3d import Pooling3D
+from keras.layers import Concatenate, Flatten, Reshape
 
 STREAM = False
 
@@ -92,11 +96,8 @@ def get_request_kif(layer:keras.layers.Layer|FixedPointQuantizer) -> tuple[int, 
             i = 65535
         return k, i, f
     
-    if hasattr(layer, 'kernel'):
-        k,i,f = 1,65535, 65535
-
-    elif layer._outbound_nodes:
-        # Main case. 
+    elif isinstance(layer, (Pooling1D, Pooling2D, Pooling3D, Concatenate, Reshape, Flatten)):
+        # Layers that does nothing. Pass through.
         out_layers:list[keras.layers.Layer] = [node.outbound_layer for node in layer._outbound_nodes]
         requested_kifs = [get_request_kif(out_layer) for out_layer in out_layers]
         k,i,f = np.max(requested_kifs, axis=0)
@@ -165,18 +166,21 @@ def get_result_kifRS(layer:keras.layers.Layer) -> tuple[int, int, int, str, str]
 def get_config_wight_accum_result_bias(layer:keras.layers.Layer, bias_accum_fp:None|int=None):
     assert hasattr(layer, 'kernel'), f'Layer {layer.name} does not have kernel.'
     r_k,r_i,r_f, RND, SAT = get_result_kifRS(layer)
+    p_k,p_i,p_f = get_produced_kif(layer)
     k_k,k_i,k_f = get_arr_bits(layer.kernel.numpy())
     k_k,k_i,k_f = k_k.max(), k_i.max(), k_f.max()
     weight_t = tuple_to_apf((k_k,k_i,k_f))
     result_t = tuple_to_apf((r_k,r_i,r_f), RND, SAT)
     if bias_accum_fp is None:
-        a_f = r_f+k_f
+        _,_,f = get_produced_kif(layer)
+        a_f = p_f
     else:
         a_f = r_f+bias_accum_fp
+
     if SAT.upper() == 'WRAP':
         accum_t = tuple_to_apf((r_k,r_i,a_f))
     else:
-        k,i,f = (get_produced_kif(layer))
+        k,i,f = p_k,p_i,a_f
         if bias_accum_fp is not None:
             warn(f'Layer {layer.name} has SAT={SAT}, and has bias_accum_fp set. Proceed only if you know what you are doing.')
             f = bias_accum_fp + r_f
