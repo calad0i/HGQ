@@ -14,6 +14,7 @@ from keras.src.layers.pooling.base_pooling3d import Pooling3D
 from keras.layers import Concatenate, Flatten, Reshape
 
 STREAM = False
+"This variable is not used for now."
 
 def get_arr_container(arr:np.ndarray):
     """ Get the minimal fixed integer that can represent the array (kif format). If the result is greater than ~30, consider that as inf. (Not representable by fixed point with reasonable bitwidth.)"""
@@ -47,7 +48,7 @@ def activation_kif_forward(func:Callable, k:int, i:int, f:int):
     """Given the input bitwidth (kif) of an activation function, get the output bitwidth (kif)."""
     assert k+i+f>0
     arr = np.array(np.linspace(-2.**i*k, 2.**i-2.**-f, 2**(k+i+f)), dtype=np.float64)
-    arr:np.ndarray = np.array(func(arr))
+    arr:np.ndarray = np.array(func(arr), dtype=np.float32)
     K,I,F = get_arr_container(arr)
     return K, I, F
 
@@ -106,6 +107,7 @@ def get_produced_kif(layer: keras.layers.Layer|FixedPointQuantizer) -> tuple[int
 
 
 def get_requested_kif(layer:keras.layers.Layer|FixedPointQuantizer) -> tuple[int, int, int]:
+    """Get the bitwidth requested by downstream layers, as a tuple of (k, i, f). By requested, it means the maximum bitwidth that downstream layers may make use of."""
     out_layers = [node.outbound_layer for node in layer._outbound_nodes]
     if len(out_layers) == 0:
         # Terminal case
@@ -157,6 +159,7 @@ def merge_precision(available:tuple[int,int,int], request:tuple[int,int,int]):
 
 
 def result_kifRS_layer_with_fusible_quantizer(layer:keras.layers.Layer):
+    """Get the result bitwidth of a layer that has a fusible quantizer following immediately, as a tuple of (k, i, f, RND, SAT). When the layer has exactly one quantizer following it, and the quantizer is not heterogenous, the quantizer will be purged during synthesis, and the result bitwidth of the layer will be the same as the quantizer."""
     out_nodes = layer._outbound_nodes
     if len(out_nodes) != 1:
         return
@@ -172,7 +175,7 @@ def result_kifRS_layer_with_fusible_quantizer(layer:keras.layers.Layer):
 
 
 def derive_result_kifRS_from_next_quantizers(layer:keras.layers.Layer) -> tuple[int, int, int, str, str]:
-    # This is a special case for input layer and activation layer. Can also be used for layers with accum in stream setting.
+    """Get the result bitwidth of a layer that has a quantizer following immediately, as a tuple of (k, i, f, RND, SAT). In general, any InputLayer or layers with kernels will have a quantizer following immediately."""
     Ks, Is, Fs, RNDs, SATs = [], [], [], [], []
     out_layers:list[FixedPointQuantizer] = [node.outbound_layer for node in layer._outbound_nodes]
     kifRSs = np.array(list(map(lambda x: (*x.result_t_kif, x.RND, x.SAT), out_layers)), dtype=object)
@@ -188,6 +191,7 @@ def derive_result_kifRS_from_next_quantizers(layer:keras.layers.Layer) -> tuple[
 
 
 def get_result_kifRS(layer:keras.layers.Layer) -> tuple[int, int, int, str, str]:
+    """Get the result bitwidth of a layer, as a tuple of (k, i, f, RND, SAT)."""
     result_t = result_kifRS_layer_with_fusible_quantizer(layer)
     if result_t is not None:
         return result_t
@@ -203,6 +207,7 @@ def get_result_kifRS(layer:keras.layers.Layer) -> tuple[int, int, int, str, str]
 
 
 def get_config_wight_accum_result_bias(layer:keras.layers.Layer, bias_accum_fp:None|int=None):
+    """Get the quantization configuration for a layer with kernel in the proxy model."""
     assert hasattr(layer, 'kernel'), f'Layer {layer.name} does not have kernel.'
     r_k,r_i,r_f, RND, SAT = get_result_kifRS(layer)
     p_k,p_i,p_f = get_produced_kif(layer)
@@ -228,6 +233,7 @@ def get_config_wight_accum_result_bias(layer:keras.layers.Layer, bias_accum_fp:N
 
 
 def get_config_table_tablesize_result(layer:keras.layers.Activation):
+    """Get the quantization configuration for a activation layer in the proxy model."""
     assert isinstance(layer, keras.layers.Activation), f'Layer {layer.name} is not an activation layer.'
     k,i,f, RND, SAT = get_result_kifRS(layer)
     result_t = tuple_to_apf((k,i,f), RND, SAT)
@@ -247,6 +253,7 @@ def get_config_table_tablesize_result(layer:keras.layers.Activation):
 
 
 def get_config(layer:keras.layers.Layer, bias_accum_fp:None|int=None):
+    """Get the quantization configuration for a layer in the proxy model."""
     if hasattr(layer, 'kernel'):
         weight_t, accum_t, result_t, bias_t = get_config_wight_accum_result_bias(layer, bias_accum_fp)
         conf = {'weight_t':weight_t, 'accum_t':accum_t, 'result_t':result_t, 'bias_t':bias_t}
@@ -261,6 +268,7 @@ def get_config(layer:keras.layers.Layer, bias_accum_fp:None|int=None):
 
 
 def _get_next_quantizer(layer:keras.layers.Layer):
+    """Get the next quantizer after the layer. Return None if there is no quantizer after the layer."""
     out_layers = [node.outbound_layer for node in layer._outbound_nodes]
     for out_layer in out_layers:
         if isinstance(out_layer, FixedPointQuantizer):
@@ -271,6 +279,7 @@ def _get_next_quantizer(layer:keras.layers.Layer):
     return None
 
 def _get_last_quantizer(layer:keras.layers.Layer): 
+    """Get the last quantizer before the layer. Return None if there is no quantizer before the layer."""
     assert len(layer._inbound_nodes) <= 1, f'Layer {layer.name} has more than one inbound nodes. This is not supported.'
     in_layers = layer._inbound_nodes[0].inbound_layers
     if not isinstance(in_layers, list):
@@ -284,6 +293,7 @@ def _get_last_quantizer(layer:keras.layers.Layer):
     return None
 
 def get_whatever_quantizer(layer:keras.layers.Layer):
+    """Find the quantizer before or after the layer."""
     if isinstance(layer, FixedPointQuantizer):
         return layer
     if isinstance(layer, keras.layers.InputLayer):
@@ -293,6 +303,7 @@ def get_whatever_quantizer(layer:keras.layers.Layer):
     return q
 
 def register_qconf(layer:keras.layers.Layer):
+    """Get and register quantization configuration for a layer in the proxy model."""
     q = get_whatever_quantizer(layer)
     conf = get_config(layer)
     overrides = q.overrides or {}

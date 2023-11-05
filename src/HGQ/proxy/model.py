@@ -209,7 +209,7 @@ def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = 
     return tensor
 
 
-def generate_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits_bias: int | None = None):
+def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits_bias: int | None = None):
 
     input_nodes, output_nodes, dependencies_list = solve_dependencies(model)
 
