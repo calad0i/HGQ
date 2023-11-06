@@ -26,14 +26,7 @@ from HGQ.layers.passive_layers import PPool1D, PPool2D
 from HGQ import HDense, HQuantize
 from HGQ import get_default_pre_activation_quantizer_config, set_default_pre_activation_quantizer_config
 from HGQ import trace_minmax
-from HGQ.proxy import generate_proxy_model
-
-seed = 42
-os.environ['RANDOM_SEED'] = f'{seed}'
-np.random.seed(seed)
-tf.random.set_seed(seed)
-tf.get_logger().setLevel('ERROR')
-random.seed(seed)
+from HGQ.proxy import to_proxy_model
 
 
 def get_model(layer: str, rnd_strategy: str, io_type: str):
@@ -76,7 +69,7 @@ def get_model(layer: str, rnd_strategy: str, io_type: str):
     return model
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope='')
 def data():
     rng = np.random.default_rng(seed)
     return rng.normal(0, 1, (1000, 16)) * rng.uniform(0, 3, (1, 16))
@@ -109,7 +102,7 @@ def test_layer(data: np.ndarray, layer: str, rnd_strategy: str, io_type: str):
     else:
         dataset = data.reshape(-1, *model.input.shape[1:])  # type: ignore
     trace_minmax(model, dataset, cover_factor=1.0)
-    proxy = generate_proxy_model(model)
+    proxy = to_proxy_model(model)
     r_keras = model.predict(dataset, verbose=0)  # type: ignore
     r_hls: np.ndarray = proxy.predict(dataset).reshape(r_keras.shape)  # type: ignore
 
@@ -118,7 +111,7 @@ def test_layer(data: np.ndarray, layer: str, rnd_strategy: str, io_type: str):
     #     assert np.allclose(r_hls, r_keras, atol=2**-4, rtol=0), f"Error margin exceeded for AvgPool layer. Max difference: {np.max(np.abs(r_keras - r_hls))}; Avg difference: {np.mean(np.abs(r_keras - r_hls))}; expected error margin: {2**-4}."
     #     # Pool by non-2^n: always non-exact
     #     # Pool by 2^n: still non-exact in general, as accumulator size is NOT configurable (straightforwardly). Is exact in standard_round & io_parallel with pool size 2 by accident, as accumulator size is increased by 1 bit effectively...
-    # else:
+    # else:or
     assert np.sum(mismatch) == 0, f"Results do not match for {layer} layer: {np.sum(mismatch)} out of {np.prod(mismatch)} entries are different. Sample: {r_keras[mismatch].ravel()[:10] - r_hls[mismatch].ravel()[:10]}"
 
 

@@ -2,7 +2,6 @@ import pytest
 
 import random
 import re
-sub = re.compile(r'[\(\)\'\[\]]')
 from pathlib import Path
 import numpy as np
 
@@ -24,7 +23,7 @@ except ImportError:
 from HGQ.layers import HDense, HConv1D, HConv2D, HActivation, HAdd, HQuantize
 from HGQ import get_default_pre_activation_quantizer_config, set_default_pre_activation_quantizer_config
 from HGQ import trace_minmax
-from HGQ.proxy import generate_proxy_model
+from HGQ.proxy import to_proxy_model
 
 seed = 42
 os.environ['RANDOM_SEED'] = f'{seed}'
@@ -78,12 +77,17 @@ def data():
 
 @pytest.mark.parametrize('rnd_strategy', ['standard_round', 'floor'])
 @pytest.mark.parametrize('io_type', ['io_parallel', 'io_stream'])
+@pytest.mark.parametrize('cover_factor', [0.49, 1.0])
 @pytest.mark.parametrize('layer',
                          ["HDense(10)",
                           "HConv1D(2, 3, padding='same')",
                           "HConv1D(2, 3, padding='valid')",
+                          "HConv1D(2, 3, padding='valid', strides=2)",
+                          "HConv1D(2, 3, padding='same', strides=2)",
                           "HConv2D(2, (3,3), padding='same')",
                           "HConv2D(2, (3,3), padding='valid')",
+                          "HConv2D(2, (3,3), padding='valid', strides=2)",
+                          "HConv2D(2, (3,3), padding='same', strides=2)",
                           "HAdd()",
                           "HActivation('relu')",
                           "HActivation('leaky_relu')",
@@ -93,7 +97,7 @@ def data():
                           "HActivation('softmax')",
                           ]
                          )
-def test_layer(data: np.ndarray, layer: str, rnd_strategy: str, io_type: str):
+def test_layer(data: np.ndarray, cover_factor:float, layer: str, rnd_strategy: str, io_type: str):
     model = get_model(layer, rnd_strategy, io_type)
     print(model.layers[-1].pre_activation_quantizer.fbw)
     io_type = io_type
@@ -101,17 +105,19 @@ def test_layer(data: np.ndarray, layer: str, rnd_strategy: str, io_type: str):
         dataset = [data, data]
     else:
         dataset = data.reshape(-1, *model.input.shape[1:])  # type: ignore
-    trace_minmax(model, dataset, cover_factor=1.0)
-    proxy = generate_proxy_model(model)
-    model.save(test_root_path / f'hls4ml_prj_hgq_{layer}_{rnd_strategy}_{io_type}.h5')
-    proxy.save(test_root_path / f'hls4ml_prj_hgq_{layer}_{rnd_strategy}_{io_type}_proxy.h5')
+    trace_minmax(model, dataset, cover_factor=cover_factor)
+    proxy = to_proxy_model(model)
+    
     r_keras = model.predict(dataset, verbose=0)  # type: ignore
-    r_hls = proxy.predict(dataset, verbose=0).reshape(r_keras.shape)  # type: ignore
+    r_proxy = proxy.predict(dataset, verbose=0).reshape(r_keras.shape)  # type: ignore
 
-    mismatch = r_keras != r_hls
-
-    assert np.sum(mismatch) == 0, f"Results do not match for {layer} layer: {np.sum(mismatch,axis=1)} out of {1000} samples are different. Sample: {r_keras[mismatch].ravel()[:10]} vs {r_hls[mismatch].ravel()[:10]}"
-
+    mismatch = r_keras != r_proxy
+    if cover_factor >= 1.0:
+        assert np.sum(mismatch) == 0, f"Results do not match for {layer} layer: {np.sum(mismatch,axis=1)} out of {1000} samples are different. Sample: {r_keras[mismatch].ravel()[:10]} vs {r_proxy[mismatch].ravel()[:10]}"
+    else:
+        assert np.sum(mismatch) > 0, f"Results match for {layer} layer but overflow should happen."
+    
+    model_hls = 
 
 if __name__ == '__main__':
     test_layer(data(), "HAdd()", 'standard_round', 'io_parallel')

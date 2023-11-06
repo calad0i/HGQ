@@ -1,7 +1,4 @@
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-
 import pytest
 
 import random
@@ -10,10 +7,13 @@ import numpy as np
 
 import tensorflow as tf
 tf.get_logger().setLevel('ERROR')
+tf.config.threading.set_inter_op_parallelism_threads(1)
+tf.config.threading.set_intra_op_parallelism_threads(1)
+
 from tensorflow import keras
+from tempfile import TemporaryDirectory
 import hls4ml
 
-test_root_path = Path(__file__).parent
 test_root_path = Path('/tmp/unit_test')
 
 try:
@@ -24,17 +24,15 @@ except ImportError:
 from HGQ.layers import HQuantize, HDense, HConv2D, HConv1D, PMaxPool2D, PReshape, PMaxPool1D, PConcatenate, PFlatten, HActivation, HAdd, PDropout
 from HGQ import get_default_pre_activation_quantizer_config, set_default_pre_activation_quantizer_config
 from HGQ import trace_minmax
-from HGQ.proxy import generate_proxy_model
-
-seed = 42
-os.environ['RANDOM_SEED'] = f'{seed}'
-np.random.seed(seed)
-tf.random.set_seed(seed)
-tf.get_logger().setLevel('ERROR')
-random.seed(seed)
+from HGQ.proxy import to_proxy_model
 
 
-def create_model(rnd_strategy:str, io_type:str):
+def create_model(rnd_strategy:str, io_type:str, seed:int=42):
+    seed = seed
+    os.environ['RANDOM_SEED'] = f'{seed}'
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    random.seed(seed)
 
     pa_config = get_default_pre_activation_quantizer_config()
     pa_config['skip_dims'] = 'all' if io_type == 'io_stream' else 'batch'
@@ -70,37 +68,37 @@ def create_model(rnd_strategy:str, io_type:str):
         # Randomize weight bitwidths
         if hasattr(layer, 'kernel_quantizer'):
             fbw:tf.Variable = layer.kernel_quantizer.fbw
-            fbw.assign(tf.constant(np.random.uniform(4,6,fbw.shape).astype(np.float32)))
+            fbw.assign(tf.constant(np.random.uniform(2,8,fbw.shape).astype(np.float32)))
         # And activation bitwidths
         if hasattr(layer, 'pre_activation_quantizer'):
             fbw:tf.Variable = layer.pre_activation_quantizer.fbw
             fbw.assign(tf.constant(np.random.uniform(2,6,fbw.shape).astype(np.float32)))
     return horrible_model
 
-def get_data(N:int, sigma:float, max_scale:float):
-    rng = np.random.default_rng(42)
+def get_data(N:int, sigma:float, max_scale:float, seed):
+    rng = np.random.default_rng(seed)
     a1 = rng.normal(0, sigma, (N,10,10,1)).astype(np.float32)
     a2 = rng.uniform(0, max_scale, (1,10,10,1)).astype(np.float32)
-    return a1*a2
-    
-    
-@pytest.mark.parametrize("N", [10, 50000])
+    return (a1*a2).astype(np.float32)
+
+
+@pytest.mark.parametrize("N", [50000, 10])
 @pytest.mark.parametrize("rnd_strategy", ['auto', 'standard_round', 'floor'])
 @pytest.mark.parametrize("io_type", ['io_parallel','io_stream'])
 @pytest.mark.parametrize("cover_factor", [0.49, 1.0])
 @pytest.mark.parametrize("aggressive", [True, False])
-@pytest.mark.parametrize("backend", ['vivado', 'vitis'])
-def test_end2end(N:int, rnd_strategy:str, io_type:str, cover_factor:float, aggressive:bool, backend:str):
-    model = create_model(rnd_strategy=rnd_strategy, io_type=io_type)
-    data = get_data(N, 1, 3)
+@pytest.mark.parametrize("backend", ['vivado'])
+@pytest.mark.parametrize("seed", [1919810, 1919, 910, 114514, 42])
+def test_end2end(N:int, rnd_strategy:str, io_type:str, cover_factor:float, aggressive:bool, backend:str, seed:int):
+    model = create_model(rnd_strategy=rnd_strategy, io_type=io_type, seed=seed)
+    data = get_data(N, 8, 1, seed)
     trace_minmax(model, data, cover_factor=cover_factor)
-    r_keras = model.predict(data, verbose=0) # type: ignore
-    print(f"Testing {rnd_strategy}_{io_type}")
-    proxy = generate_proxy_model(model, aggressive=aggressive)
-    output_dir=test_root_path / f'huge_hls4ml_prj_hgq_{N}_{rnd_strategy}_{io_type}_overflow={cover_factor<1}_SAT={not aggressive}_{backend}'
+    proxy = to_proxy_model(model, aggressive=aggressive)
+    output_dir=test_root_path / f'{seed}-{backend}-{aggressive}-{cover_factor}-{io_type}-{rnd_strategy}-{N}'
     model.save(output_dir / 'model.h5')
     proxy.save(output_dir / 'proxy.h5')
-    r_proxy = proxy.predict(data, verbose=0) # type: ignore
+    r_keras = model(data).numpy() # type: ignore
+    r_proxy = proxy(data).numpy() # type: ignore
 
     mismatch_proxy = r_keras != r_proxy
     if cover_factor >= 1.0:
@@ -108,30 +106,17 @@ def test_end2end(N:int, rnd_strategy:str, io_type:str, cover_factor:float, aggre
     else:
         assert np.sum(mismatch_proxy)>0, f"Proxy-Keras perfect match when overflow should happen: cover_factor={cover_factor}."
 
-    hls_config = {'LayerName':{}}
+    hls_config = {'LayerName':{}, 'Model': {'Precision': 'ap_fixed<32,16>', 'ReuseFactor': 1}}
     for layer in proxy.layers:
         name = layer.name
-        hls_config['LayerName'][name] = {'Trace': True, 'IOType':io_type, 'Backend':backend}
+        hls_config['LayerName'][name] = {'Trace': False}
 
-    model_hls = hls4ml.converters.convert_from_keras_model(proxy, hls_config=hls_config, output_dir=str(output_dir/'hls4ml_prj'))
+    model_hls = hls4ml.converters.convert_from_keras_model(proxy, hls_config=hls_config, output_dir=str(output_dir/'hls4ml_prj'), io_type=io_type, backend=backend)
     
-    hls_trace = model_hls.trace(data)[1]
-    keras_trace = hls4ml.model.profiling.get_ymodel_keras(proxy, data)
-    for k in hls_trace.keys():
-        kk = k
-        if not k.endswith('quantizer'):
-            if io_type == 'io_stream':
-                if f'{k}_quantizer' not in keras_trace.keys():
-                    continue
-                kk = f'{k}_quantizer'
-            else:
-                continue
-        v_k, v_h = hls_trace[k], keras_trace[kk]
-        trace_mismatch = np.all(v_k != v_h)
-        assert np.sum(trace_mismatch)==0, f"Trace mismatch for {k}: {np.sum(trace_mismatch)} out of {N} samples are different. Sample: {v_k[trace_mismatch].ravel()[:5]} vs {v_h[trace_mismatch].ravel()[:5]}"
-        print(f'{k}: All \033[92m{np.prod(v_k.shape)}\033[0m entries match.')
-        # raise Exception(f"Stop")
-        
+    model_hls.compile()
+    r_hls:np.ndarray = model_hls.predict(data).reshape(r_proxy.shape) # type: ignore
+    mismatch_hls = r_hls != r_proxy
+    assert np.sum(mismatch_hls)==0, f"Keras-HLS4ML mismatch: {np.sum(np.any(mismatch_hls,axis=1))} out of {N} samples are different. Sample: {r_proxy[mismatch_hls].ravel()[:5]} vs {r_hls[mismatch_hls].ravel()[:5]}"
+
 if __name__ == '__main__':
-    test_end2end(10, 'standard_round', 'io_stream', 0.49, True, 'vivado')
-    
+    test_end2end(10, 'auto', 'io_stream', 0.49, False, 'vivado', 1919)

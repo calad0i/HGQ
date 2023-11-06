@@ -24,7 +24,7 @@ except ImportError:
 from HGQ.layers import HQuantize, HDense, HConv2D, HConv1D, PMaxPool2D, PReshape, PMaxPool1D, PFlatten, HActivation
 from HGQ import get_default_pre_activation_quantizer_config, set_default_pre_activation_quantizer_config
 from HGQ import trace_minmax
-from HGQ.proxy import generate_proxy_model
+from HGQ.proxy import to_proxy_model
 
 seed = 42
 os.environ['RANDOM_SEED'] = f'{seed}'
@@ -83,7 +83,7 @@ def test_end2end(N:int, rnd_strategy:str, io_type:str, cover_factor:float, aggre
     trace_minmax(model, data, cover_factor=cover_factor)
     r_keras = model.predict(data, verbose=0) # type: ignore
     print(f"Testing {rnd_strategy}_{io_type}")
-    proxy = generate_proxy_model(model, aggressive=aggressive)
+    proxy = to_proxy_model(model, aggressive=aggressive)
     output_dir=test_root_path / f'hls4ml_prj_hgq_{N}_{rnd_strategy}_{io_type}_overflow={cover_factor<1}_SAT={not aggressive}_{backend}'
     model.save(output_dir / 'model.h5')
     proxy.save(output_dir / 'proxy.h5')
@@ -101,8 +101,9 @@ def test_end2end(N:int, rnd_strategy:str, io_type:str, cover_factor:float, aggre
         hls_config['LayerName'][name] = {'Trace': True, 'IOType':io_type, 'Backend':backend}
 
     model_hls = hls4ml.converters.convert_from_keras_model(proxy, hls_config=hls_config, output_dir=str(output_dir/'hls4ml_prj'))
-    
-    hls_trace = model_hls.trace(data)[1]
+
+    hls_result, hls_trace = model_hls.trace(data)
+    keras_result = proxy(data).numpy()
     keras_trace = hls4ml.model.profiling.get_ymodel_keras(proxy, data)
     for k in hls_trace.keys():
         kk = k
@@ -118,7 +119,7 @@ def test_end2end(N:int, rnd_strategy:str, io_type:str, cover_factor:float, aggre
         assert np.sum(trace_mismatch)==0, f"Trace mismatch for {k}: {np.sum(trace_mismatch)} out of {N} samples are different. Sample: {v_k[trace_mismatch].ravel()[:5]} vs {v_h[trace_mismatch].ravel()[:5]}"
         print(f'{k}: All \033[92m{np.prod(v_k.shape)}\033[0m entries match.')
         # raise Exception(f"Stop")
-        
+    assert np.all(hls_result.reshape(keras_result.shape) == keras_result), "HLS4ML model output mismatch"
 if __name__ == '__main__':
     test_end2end(10, 'standard_round', 'io_stream', 0.49, True, 'vivado')
     
