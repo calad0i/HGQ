@@ -150,6 +150,10 @@ def fixed(bits, integer_bits, RND='TRN', SAT='WRAP') -> Callable:
 class FixedPointQuantizer(keras.layers.Layer):
 
     def __init__(self, keep_negative, bits, integers, RND: str = 'TRN', SAT: str = 'WRAP', overrides: dict | None = None, aggressive=True, accum_bits_bias=None, **kwargs):
+        
+        zeros = bits == 0
+        keep_negative = tf.where(zeros, tf.zeros_like(keep_negative), keep_negative)
+        integers = tf.where(zeros, tf.zeros_like(integers), integers)
         self.keep_negative = tf.Variable(keep_negative, dtype='int8', name='keep_negative', trainable=False)
         self.bits = tf.Variable(bits, dtype='int8', name='bits', trainable=False)
         self.integers = tf.Variable(integers, dtype='int8', name='integers', trainable=False)

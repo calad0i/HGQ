@@ -127,6 +127,10 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', agg
         return FixedPointQuantizer(layer.keep_negative, layer.bits, layer.int_bits, 'TRN', SAT),
 
     quantizer = layer.pre_activation_quantizer
+    if quantizer.rnd_strategy != 3 and not layer.can_bias_cover_rnd:
+        RND = 'RND'
+    else:
+        RND = 'TRN'
 
     relu_act = layer._relu_act
     overriddes = None
@@ -145,26 +149,23 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', agg
             overriddes['layers'][name]['parallelization_factor'] = parallel_factor
 
     int_bits, fp_bits, kn = quantizer.get_bits_exact(pos_only=False)  # type: ignore
-    if quantizer.rnd_strategy != 3 and not layer.can_bias_cover_rnd:
-        RND = 'RND'
-    else:
-        RND = 'TRN'
 
     if not relu_act:
         k, b, i = kn, kn + int_bits + fp_bits, kn + int_bits
         return FixedPointQuantizer(k, b, i, RND, SAT, name=f'{name}_quantizer', overrides=overriddes, aggressive=aggressive, accum_bits_bias=accum_bits_bias),
 
-    if quantizer.rnd_strategy != 3 and not layer.can_bias_cover_rnd:
-        RND = 'RND'
-    else:
-        RND = 'TRN'
-    k, b, i = np.zeros_like(kn), int_bits + fp_bits, int_bits
-    relu_quantizer = FixedPointQuantizer(k, b, i, RND, SAT, name=f'{name}_relu_quantizer')
+    mask = int_bits + fp_bits + kn > 0
+
+    r_int_bits, r_fp_bits, rk = quantizer.get_bits_exact(pos_only=True)
+    rk, rb, ri = rk, r_int_bits + r_fp_bits, r_int_bits
+    relu_quantizer = FixedPointQuantizer(rk, rb, ri, RND, SAT, name=f'{name}_relu_quantizer')
 
     if isinstance(layer, keras.layers.Activation):
         return relu_quantizer,
 
-    k, i, f = tf.reduce_max(kn, keepdims=True), tf.reduce_max(int_bits, keepdims=True), tf.reduce_max(fp_bits, keepdims=True)
+    k = tf.reduce_max(kn[mask], keepdims=True)
+    i = tf.reduce_max(int_bits[mask], keepdims=True)
+    f = tf.reduce_max(fp_bits[mask], keepdims=True)
     k, b, i = k, k + i + f, k + i
 
     # If there is a rounding following the layer, keep one or two extra bit and do NOT round perserve bit accuracy.
@@ -174,7 +175,6 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', agg
         b += 2
 
     layer_quantizer = FixedPointQuantizer(k, b, i, 'TRN', SAT, name=f'{name}_quantizer', overrides=overriddes, aggressive=aggressive, accum_bits_bias=accum_bits_bias)
-    int_bits, fp_bits, kn = quantizer.get_bits_exact(pos_only=True)  # type: ignore
 
     return layer_quantizer, relu_quantizer
 
