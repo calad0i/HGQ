@@ -76,7 +76,7 @@ def get_data(N:int, sigma:float, max_scale:float, seed):
 @pytest.mark.parametrize("aggressive", [True, False])
 @pytest.mark.parametrize("backend", ['vivado'])
 @pytest.mark.parametrize("seed", [42])
-def test_end2end(layer, N:int, rnd_strategy:str, io_type:str, cover_factor:float, aggressive:bool, backend:str, seed:int):
+def test_syn_players(layer, N:int, rnd_strategy:str, io_type:str, cover_factor:float, aggressive:bool, backend:str, seed:int):
     dir = get_test_dir()
     set_seed(seed)
     model = create_model(layer=layer,rnd_strategy=rnd_strategy, io_type=io_type)
@@ -86,4 +86,4 @@ def test_end2end(layer, N:int, rnd_strategy:str, io_type:str, cover_factor:float
 
 
 if __name__ == '__main__':
-    test_end2end('PFlatten()', 10, 'floor', 'io_parallel', 0.5, True, 'vivado', 42)
+    test_syn_players('PFlatten()', 10, 'floor', 'io_parallel', 0.5, True, 'vivado', 42)
