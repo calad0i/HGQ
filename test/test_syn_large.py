@@ -12,12 +12,7 @@ import os
 import random
 
 
-def create_model(rnd_strategy:str, io_type:str, seed:int):
-    seed = seed
-    os.environ['RANDOM_SEED'] = f'{seed}'
-    np.random.seed(seed)
-    tf.random.set_seed(seed)
-    random.seed(seed)
+def create_model(rnd_strategy:str, io_type:str):
 
     pa_config = get_default_pre_activation_quantizer_config()
     pa_config['skip_dims'] = 'all' if io_type == 'io_stream' else 'batch'
@@ -72,11 +67,12 @@ def get_data(N:int, sigma:float, max_scale:float, seed):
 @pytest.mark.parametrize("io_type", ['io_parallel','io_stream'])
 @pytest.mark.parametrize("cover_factor", [0.49, 1.0])
 @pytest.mark.parametrize("aggressive", [True, False])
-@pytest.mark.parametrize("backend", ['vivado'])
+@pytest.mark.parametrize("backend", ['vivado', 'vitis'])
 @pytest.mark.parametrize("seed", [1919810, 1919, 910, 114514, 42])
 def test_end2end(N:int, rnd_strategy:str, io_type:str, cover_factor:float, aggressive:bool, backend:str, seed:int):
     dir = get_test_dir()
-    model = create_model(rnd_strategy=rnd_strategy, io_type=io_type, seed=seed)
+    set_seed(seed)
+    model = create_model(rnd_strategy=rnd_strategy, io_type=io_type)
     data = get_data(N, 8, 1, seed)
     
     run_model_test(model, cover_factor, data, io_type, backend, dir, aggressive)

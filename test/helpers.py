@@ -48,9 +48,10 @@ def _run_synth_match_test(proxy:keras.Model,data, io_type:str, backend:str, dir:
     if len(proxy.outputs)>1: # type: ignore
         r_proxy:list[np.ndarray] = [x.numpy() for x in proxy(data)] # type: ignore
         r_hls:list[np.ndarray] = hls_model.predict(data) # type: ignore
+        r_hls = [x.reshape(r_proxy[i].shape) for i,x in enumerate(r_hls)]
     else:
         r_proxy:list[np.ndarray] = [proxy(data).numpy()] # type: ignore
-        r_hls:list[np.ndarray] = [hls_model.predict(data)] # type: ignore
+        r_hls:list[np.ndarray] = [hls_model.predict(data).reshape(r_proxy[0].shape)] # type: ignore
     
     errors = []
     for i,(p,h) in enumerate(zip(r_proxy, r_hls)):
@@ -76,8 +77,8 @@ def _run_model_sl_test(model:keras.Model, proxy:keras.Model, data, output_dir:st
             continue
         assert l1.overrides==l2.overrides, f"Overrides mismatch for layer {l1.name}"
         
-    assert np.all(model.predict(data)==model_loaded.predict(data)), f"Model premdiction mismatch"
-    assert np.all(proxy.predict(data)==proxy_loaded.predict(data)), f"Proxy prediction mismatch"
+    assert tf.reduce_all(model(data)==model_loaded(data)), f"Model premdiction mismatch"
+    assert tf.reduce_all(proxy(data)==proxy_loaded(data)), f"Proxy prediction mismatch"
     
 def _run_model_proxy_match_test(model:keras.Model, proxy:keras.Model, data, cover_factor:float):
     nof_outputs = len(model.outputs) # type: ignore
@@ -104,7 +105,7 @@ def _run_model_proxy_match_test(model:keras.Model, proxy:keras.Model, data, cove
             warn(f"Keras-Proxy perfect match when overflow should happen: cover_factor={cover_factor}.")
 
 
-def run_model_test(model:keras.Model, cover_factor:float, data, io_type:str, backend:str, dir:str, aggressive:bool):
+def run_model_test(model:keras.Model, cover_factor:float, data, io_type:str, backend:str, dir:str, aggressive:bool, no_exact_match:bool=False):
     data_len = data.shape[0] if isinstance(data, np.ndarray) else data[0].shape[0]
     trace_minmax(model, data, cover_factor=cover_factor, bsz=data_len)
     proxy = to_proxy_model(model, aggressive=aggressive)
