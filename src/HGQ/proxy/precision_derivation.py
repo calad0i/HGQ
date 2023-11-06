@@ -36,9 +36,9 @@ def get_arr_container(arr:np.ndarray):
     with np.errstate(divide='ignore'):
         i1, i2 = -np.inf, -np.inf
         if (~k).any():
-            i1 = np.floor(1+np.log2(arr[~k]*2**f)).max()
+            i1 = np.floor(1+np.log2(arr[~k]*2.**f)).max()
         if k.any():
-            i2 = np.ceil(np.log2(-arr[k]*2**f)).max()
+            i2 = np.ceil(np.log2(-arr[k]*2.**f)).max()
         i = int(max(i1, i2))
     i-=f
     k=int(k.any())
@@ -46,8 +46,9 @@ def get_arr_container(arr:np.ndarray):
 
 def activation_kif_forward(func:Callable, k:int, i:int, f:int):
     """Given the input bitwidth (kif) of an activation function, get the output bitwidth (kif)."""
-    assert k+i+f>0
-    arr = np.array(np.linspace(-2.**i*k, 2.**i-2.**-f, 2**(k+i+f)), dtype=np.float64)
+    assert k+i+f>0, 'Activation function is applied to an zero array. Something is wrong.'
+    N = min(2**(k+i+f), 2**20)
+    arr = np.array(np.linspace(-2.**i*k, 2.**i-2.**-f, N), dtype=np.float64)
     arr:np.ndarray = np.array(func(arr), dtype=np.float32)
     K,I,F = get_arr_container(arr)
     return K, I, F
@@ -135,14 +136,15 @@ def get_request_kif(layer:keras.layers.Layer|FixedPointQuantizer) -> tuple[int, 
             i = 65535
         return k, i, f
     
-    elif isinstance(layer, (Pooling1D, Pooling2D, Pooling3D, Concatenate, Reshape, Flatten)):
-        # Layers that does nothing. Pass through.
-        out_layers:list[keras.layers.Layer] = [node.outbound_layer for node in layer._outbound_nodes]
-        requested_kifs = [get_request_kif(out_layer) for out_layer in out_layers]
-        k,i,f = np.max(requested_kifs, axis=0)
     else:
-        k,i,f = 1,65535, 65535
-    return k,i,f
+        if isinstance(layer, (Pooling1D, Pooling2D, Pooling3D, Concatenate, Reshape, Flatten)):
+            out_layers:list[keras.layers.Layer] = [node.outbound_layer for node in layer._outbound_nodes]
+            if out_layers:
+        # Layers that does nothing. Pass through.
+                requested_kifs = [get_request_kif(out_layer) for out_layer in out_layers]
+                k,i,f = np.max(requested_kifs, axis=0)
+                return k,i,f
+    return 1,65535, 65535
 
 
 def merge_precision(available:tuple[int,int,int], request:tuple[int,int,int]):
