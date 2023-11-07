@@ -24,7 +24,7 @@ def create_model(rnd_strategy:str, io_type:str):
         HConv2D(4, 2, activation='relu'),
         PMaxPool2D(2),
         PReshape((8,2)),
-        HConv1D(1, 3, activation='relu', padding='same'),
+        HConv1D(4, 3, activation='relu', padding='same'),
         PMaxPool1D(2),
         PFlatten(),
         HDense(10),
@@ -39,12 +39,7 @@ def create_model(rnd_strategy:str, io_type:str):
         # And activation bitwidths
         if hasattr(layer, 'pre_activation_quantizer'):
             fbw:tf.Variable = layer.pre_activation_quantizer.fbw
-            fbw_np = np.random.uniform(2,6,fbw.shape).astype(np.float32)
-            if fbw_np.size >= 4:
-                hole = np.random.choice(fbw_np.size, 1)
-                fbw_np.ravel()[hole] = -10.
-                # print(fbw_np)
-            fbw.assign(tf.constant(fbw_np))
+            fbw.assign(tf.constant(np.random.uniform(2,6,fbw.shape).astype(np.float32)))
     return model
 
 def get_data(N:int, sigma:float, max_scale:float, seed):
@@ -71,4 +66,4 @@ def test_syn_small(N:int, rnd_strategy:str, io_type:str, cover_factor:float, agg
 
 
 if __name__ == '__main__':
-    test_syn_small(10, 'auto', 'io_parallel', 0.49, True, 'vitis', 42)
+    test_syn_small(10, 'auto', 'io_parallel', 0.49, True, 'vivado', 1919810)
