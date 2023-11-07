@@ -122,7 +122,7 @@ def to_keras_layers(layer: HLayerBase | PLayerBase, name: str) -> tuple[keras.la
         return klayer,
 
 
-def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', aggressive=True, accum_bits_bias=None) -> tuple[FixedPointQuantizer, ...]:
+def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', accum_bits_bias=None) -> tuple[FixedPointQuantizer, ...]:
     if isinstance(layer, Signature):
         return FixedPointQuantizer(layer.keep_negative, layer.bits, layer.int_bits, 'TRN', SAT),
 
@@ -152,7 +152,7 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', agg
 
     if not relu_act:
         k, b, i = kn, kn + int_bits + fp_bits, kn + int_bits
-        return FixedPointQuantizer(k, b, i, RND, SAT, name=f'{name}_quantizer', overrides=overriddes, aggressive=aggressive, accum_bits_bias=accum_bits_bias),
+        return FixedPointQuantizer(k, b, i, RND, SAT, name=f'{name}_quantizer', overrides=overriddes, accum_bits_bias=accum_bits_bias),
 
     mask = int_bits + fp_bits + kn > 0
 
@@ -174,7 +174,7 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', agg
     elif RND != 'TRN':
         b += 2
 
-    layer_quantizer = FixedPointQuantizer(k, b, i, 'TRN', SAT, name=f'{name}_quantizer', overrides=overriddes, aggressive=aggressive, accum_bits_bias=accum_bits_bias)
+    layer_quantizer = FixedPointQuantizer(k, b, i, 'TRN', SAT, name=f'{name}_quantizer', overrides=overriddes, accum_bits_bias=accum_bits_bias)
 
     return layer_quantizer, relu_quantizer
 
@@ -182,7 +182,7 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', agg
 SKIP_LAYERS = (PDropout,)
 
 
-def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = None, SAT='WRAP', aggressive: bool = True, accum_bits_bias=None):
+def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = None, SAT='WRAP', accum_bits_bias=None):
     if isinstance(layer, SKIP_LAYERS):
         return tensor
     if namer is not None:
@@ -194,7 +194,7 @@ def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = 
     if hasattr(keras.layers, layer.__class__.__name__[1:]):
         proxy_layers = to_keras_layers(layer, name)
     if hasattr(layer, 'pre_activation_quantizer'):
-        proxy_quantizer_layers = extract_quantizers(layer, name, SAT, aggressive, accum_bits_bias)
+        proxy_quantizer_layers = extract_quantizers(layer, name, SAT, accum_bits_bias)
     if len(proxy_layers) > len(proxy_quantizer_layers) and isinstance(layer, HLayerBase):
         warn(f'Layer {layer.name} does not have a quantizer attached!')
     assert proxy_layers or proxy_quantizer_layers, f'Failed to convert layer {layer.name}: layer not mapped to anything.'
@@ -234,7 +234,7 @@ def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits_bias:
             inps = [satisfied[node] for node in requires]
             if len(inps) == 1:
                 inps = inps[0]
-            out = apply_proxy_layers(layer, inps, namer=namer, SAT=SAT, aggressive=aggressive, accum_bits_bias=accum_bits_bias)
+            out = apply_proxy_layers(layer, inps, namer=namer, SAT=SAT, accum_bits_bias=accum_bits_bias)
             satisfied[provides] = out
             if provides in output_nodes:
                 outputs.append(out)

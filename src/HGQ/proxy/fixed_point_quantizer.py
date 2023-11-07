@@ -3,16 +3,14 @@ from typing import Callable
 import tensorflow as tf
 from keras import backend as K
 
-import re
-from typing import Optional, Generator
-
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from keras import backend as K
-from ..utils import apf_to_tuple, tuple_to_apf, warn
-# Nice figure (Figure. 2 and 3) from https://www.researchgate.net/publication/226964494_Formalization_of_Fixed-Point_Arithmetic_in_HOL to illustrate the rounding and saturation modes.
 
+from warnings import warn
+
+# Nice figure (Figure. 2 and 3) from https://www.researchgate.net/publication/226964494_Formalization_of_Fixed-Point_Arithmetic_in_HOL to illustrate the rounding and saturation modes.
 
 def TRN(x):
     # Truncate towards negative infinity. Fast. Preferred when possible.
@@ -149,7 +147,7 @@ def fixed(bits, integer_bits, RND='TRN', SAT='WRAP') -> Callable:
 
 class FixedPointQuantizer(keras.layers.Layer):
 
-    def __init__(self, keep_negative, bits, integers, RND: str = 'TRN', SAT: str = 'WRAP', overrides: dict | None = None, aggressive=True, accum_bits_bias=None, **kwargs):
+    def __init__(self, keep_negative, bits, integers, RND: str = 'TRN', SAT: str = 'WRAP', overrides: dict | None = None, accum_bits_bias=None, **kwargs):
         
         zeros = bits == 0
         keep_negative = tf.where(zeros, tf.zeros_like(keep_negative), keep_negative)
@@ -162,9 +160,6 @@ class FixedPointQuantizer(keras.layers.Layer):
         self.accum_bits_bias = accum_bits_bias
         self.RND = RND
         self.SAT = SAT
-        self.aggressive = aggressive
-        if not aggressive and SAT == 'WRAP':
-            warn('It\'s odd that aggressive=False and SAT=WRAP are used together. Though probably no one should never do this, you are the boss.')
         self.overrides = overrides or {'layers': {}}
         kwargs.pop('trainable', None)
         self._quantizer_created = False
