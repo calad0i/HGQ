@@ -11,6 +11,7 @@ from keras.src.layers.convolutional.base_conv import Conv
 from keras.src.layers.pooling.base_pooling1d import Pooling1D
 from keras.src.layers.pooling.base_pooling2d import Pooling2D
 from keras.src.layers.pooling.base_pooling3d import Pooling3D
+from keras.layers import AveragePooling1D,AveragePooling2D, AveragePooling3D
 from keras.layers import Concatenate, Flatten, Reshape
 
 STREAM = False
@@ -90,9 +91,12 @@ def get_produced_kif(layer: keras.layers.Layer|FixedPointQuantizer) -> tuple[int
                 multiplicity = np.prod(layer.kernel.shape)
                 warn(f'Layer {layer.name} is not Dense or Conv. Multiplicity for accum size estimation is assumed to be maximum whole size of {multiplicity}.')
             i += int(np.ceil(np.log2(multiplicity)))
-        if isinstance(layer, keras.layers.Activation):
+        elif isinstance(layer, keras.layers.Activation):
             # k,i,f, R, S = derive_result_kifRS_from_next_quantizers(layer)
             k,i,f = activation_kif_forward(layer.activation, k,i,f)
+        elif isinstance(layer, (AveragePooling3D, AveragePooling2D, AveragePooling1D)):
+            pool_size = np.prod(layer.pool_size)
+            f += int(np.ceil(np.log2(pool_size)))
     else:
         if isinstance(layer, keras.layers.Add):
             k,i,f = np.max(kifs, axis=0)
