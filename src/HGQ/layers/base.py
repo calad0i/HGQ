@@ -119,7 +119,7 @@ class HLayerBase(tf.keras.layers.Layer):
     @tf.function(jit_compile=True)
     def kernel_bw(self):
         """Returns (over) approximated bitwidth of the kernel. Differentiable."""
-        int_bits, fp_bits, kn = self.kernel_quantizer.get_bits(self.kernel)  # type: ignore
+        int_bits, fp_bits, kn = self.kernel_quantizer.get_bits(self.fused_kernel)  # type: ignore
         k_bw = tf.nn.relu(int_bits + fp_bits)  # negative sign not considered for kernel
         k_bw = scale_grad(k_bw, tf.sqrt(1. / self.kernel_quantizer.degeneracy))  # type: ignore
         return tf.broadcast_to(k_bw, self.kernel.shape)
@@ -135,7 +135,7 @@ class HLayerBase(tf.keras.layers.Layer):
     @property
     def kernel_bw_exact(self):
         """Returns exact bitwidth of the kernel. Non-differentiable. For post-training use."""
-        int_bits, fb, kn = self.kernel_quantizer.get_bits_exact(self.kernel)
+        int_bits, fb, kn = self.kernel_quantizer.get_bits_exact(self.fused_kernel)
         return int_bits + fb  # sign not considered for kernel
 
     @property
@@ -157,25 +157,26 @@ class HLayerBase(tf.keras.layers.Layer):
             return None
 
     @property
-    @tf.function(jit_compile=True)
-    def qkernel(self):
-        """Returns the quantized kernel. non-differentiable."""
-        return self.kernel_quantizer(self.kernel, training=False)  # type: ignore
+    def fused_bias(self):
+        return self.bias
+    
+    @property
+    def fused_kernel(self):
+        return self.kernel
 
     @property
     @tf.function(jit_compile=True)
-    def qbias(self):
-        if not self._has_bias:
-            return None
-        """Returns the quantized bias. non-differentiable."""
-        return self.pre_activation_quantizer.bias_forward(self.bias, False, self.channel_loc)  # type: ignore
+    def fused_qkernel(self):
+        """Returns the final, quantized kernel for deployment. non-differentiable, should not be used for training."""
+        return self.kernel_quantizer(self.fused_kernel, training=False)  # type: ignore
 
     @property
     @tf.function(jit_compile=True)
     def fused_qbias(self):
-        """Returns the adjusted quantized bias to bypass explicit rounding."""
-        qbias = self.qbias
-        if qbias is None:
+        """Returns the final, quantized bias for deployment. non-differentiable, should not be used for training. When using rounding to nearest and the bias can cover the rounding error, bias is pre-biased to cover the rounding shift 2^-fbw, and then TRN can be used instead RND without any loss of accuracy."""
+        bias = self.pre_activation_quantizer.bias_forward(self.fused_bias, False, self.channel_loc) # type: ignore
+        
+        if bias is None:
             return None
 
         fbw = self.pre_activation_quantizer.fbw
@@ -187,13 +188,13 @@ class HLayerBase(tf.keras.layers.Layer):
             raise ValueError('channel_loc must be -1 or 1')
 
         fbw = tf.reduce_max(self.pre_activation_quantizer.fbw, axis=dims, keepdims=False)
-        fbw = tf.broadcast_to(fbw, qbias.shape)
+        fbw = tf.broadcast_to(fbw, bias.shape)
         mask = tf.reduce_max(self.act_bw, axis=dims, keepdims=False) > 0
 
         if self.pre_activation_quantizer.rnd_strategy != 3 and self.can_bias_cover_rnd:
-            qbias = tf.pow(2., -tf.floor(fbw + 0.5) - 1) + qbias  # type: ignore
+            bias = tf.pow(2., -tf.floor(fbw + 0.5) - 1) + bias  # type: ignore
 
-        return tf.where(mask, qbias, 0.)
+        return tf.where(mask, bias, 0.)
 
     def reset_minmax(self):
         """Resets the recorded minmax values for the pre-activation quantizer."""

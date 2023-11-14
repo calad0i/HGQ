@@ -56,10 +56,10 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
     @tf.function(jit_compile=True)
     def jit_forward(self, x, training=None, record_minmax=None):
 
-        kq = self.kernel_quantizer(self.kernel, training, False)  # type: ignore
+        kq = self.kernel_quantizer(self.fused_kernel, training, False)  # type: ignore
         z = tf.matmul(x, kq)
         if self.use_bias:
-            b = self.pre_activation_quantizer.bias_forward(self.bias, training, self.channel_loc)  # type: ignore
+            b = self.pre_activation_quantizer.bias_forward(self.fused_bias, training, self.channel_loc)  # type: ignore
             z = tf.nn.bias_add(z, b)
         z = self.pre_activation_quantizer(z, training, record_minmax)  # type: ignore
         a = self.activation(z)  # type: ignore

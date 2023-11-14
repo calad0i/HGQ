@@ -114,11 +114,10 @@ class HConv(HLayerBase, Conv):
     @tf.function(jit_compile=True)
     def jit_forward(self, x, training=None, record_minmax=None):
 
-        kq = self.kernel_quantizer(self.kernel, training, False)  # type: ignore
+        kq = self.kernel_quantizer(self.fused_kernel, training, False)  # type: ignore
         z = self.convolution_op(x, kq)  # type: ignore
         if self.use_bias:
-            b = self.pre_activation_quantizer.bias_forward(self.bias, training)  # type: ignore
-            # b = tf.reshape(b, (-1))
+            b = self.pre_activation_quantizer.bias_forward(self.fused_bias, training)  # type: ignore
             z = tf.nn.bias_add(z, b, data_format=self._tf_data_format)
         z = self.pre_activation_quantizer(z, training, record_minmax)  # type: ignore
         a = self.activation(z)  # type: ignore

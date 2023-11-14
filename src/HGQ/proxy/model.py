@@ -59,14 +59,10 @@ def copy_fused_weights(src: keras.layers.Layer, dst: keras.layers.Layer):
     if hasattr(dst, 'kernel'):
         if (k := getattr(src, 'fused_qkernel', None)) is not None:
             dst.kernel.assign(k)
-        elif (k := getattr(src, 'qkernel', None)) is not None:
-            dst.kernel.assign(k)
         else:
             dst.kernel.assign(src.kernel)
     if hasattr(dst, 'bias'):
         if (b := getattr(src, 'fused_qbias', None)) is not None:
-            dst.bias.assign(b)
-        elif (b := getattr(src, 'qbias', None)) is not None:
             dst.bias.assign(b)
         elif (b := getattr(src, 'bias', None)) is not None:
             dst.bias.assign(b)
