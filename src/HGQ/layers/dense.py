@@ -76,7 +76,7 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
         return bops
 
 
-class HDenseBatchnorm(HDense, HBatchNormBase):
+class HDenseBatchNorm(HDense, HBatchNormBase):
     
     def __init__(
         self,

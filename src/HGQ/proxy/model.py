@@ -116,8 +116,8 @@ def to_keras_layers(layer: HLayerBase | PLayerBase, name: str) -> tuple[keras.la
     cls_name = layer.__class__.__name__[1:]
     if hasattr(keras.layers, cls_name):
         layer_cls = getattr(keras.layers, cls_name)
-    elif hasattr(keras.layers, cls_name.replace('Batchnorm', '')):
-        layer_cls = getattr(keras.layers, cls_name.replace('Batchnorm', ''))
+    elif hasattr(keras.layers, cls_name.replace('BatchNorm', '')):
+        layer_cls = getattr(keras.layers, cls_name.replace('BatchNorm', ''))
     else:
         raise RuntimeError(f'Unknown layer type {layer.__class__.__name__}: no corresponding keras layer found.')
     klayer = layer_cls.from_config(conf)
