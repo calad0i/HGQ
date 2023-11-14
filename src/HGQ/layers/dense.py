@@ -121,6 +121,7 @@ class HDenseBatchnorm(HDense, HBatchNormBase):
             kernel_quantizer_config=kernel_quantizer_config,
             pre_activation_quantizer_config=pre_activation_quantizer_config,
             beta=beta,
+            axis=-1,
             momentum=momentum,
             epsilon=epsilon,
             center=center,
