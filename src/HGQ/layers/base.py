@@ -18,7 +18,6 @@ class HLayerBase(tf.keras.layers.Layer):
     """
 
     def __init__(self, kernel_quantizer_config=None, pre_activation_quantizer_config=None, beta=0., **kwargs):
-        super().__init__(**kwargs)
         self._has_kernel = None
         self._has_bias = None
         self.kernel_quantizer_config = kernel_quantizer_config or get_default_kernel_quantizer_config()
@@ -26,6 +25,9 @@ class HLayerBase(tf.keras.layers.Layer):
         self.beta = tf.constant(beta, dtype=tf.float32, name='beta')
         self.record_minmax = False
         self._has_last_layer = False
+        self._do_adapt_kernel_bits = kwargs.pop('do_adapt_kernel_bits', True)
+        self._delayed_kernel_bits_adaption = False
+        super().__init__(**kwargs)
 
     def build(self, input_shape):
         super().build(input_shape)
@@ -82,7 +84,9 @@ class HLayerBase(tf.keras.layers.Layer):
             )
             kq.build(fbw)
             kq.degeneracy = degeneracy
-            kq.adapt_bw_bits(self.kernel)
+            if self._do_adapt_kernel_bits and not self._delayed_kernel_bits_adaption:
+                kq.adapt_bw_bits(self.kernel)
+                self._do_adapt_kernel_bits = False
             self.kernel_quantizer = kq
 
         aq = HGQ.from_config(self.pre_activation_quantizer_config)

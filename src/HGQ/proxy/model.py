@@ -5,7 +5,7 @@ from keras.src.engine.node import Node
 from keras.src.layers.convolutional.base_conv import Conv as BaseConv
 
 from .fixed_point_quantizer import FixedPointQuantizer
-from ..layers import HLayerBase, PLayerBase, Signature, PDropout
+from ..layers import HLayerBase, PLayerBase, Signature, PDropout, HQuantize
 from .precision_derivation import register_qconf
 from ..utils import warn
 
@@ -93,12 +93,17 @@ class Namer:
 
 
 def to_keras_layers(layer: HLayerBase | PLayerBase, name: str) -> tuple[keras.layers.Layer, ...]:
+    
+    if isinstance(layer, (HQuantize, Signature)):
+        return tuple()
+
     if hasattr(layer, 'get_keras_config'):
         conf = layer.get_keras_config()
     else:
         conf = layer.get_config()
     conf['name'] = name
     activation_layer = None
+
     if not isinstance(layer, keras.layers.Activation):
         if 'activation' in conf and conf['activation'] != 'linear':
             activation = conf['activation']
@@ -108,7 +113,13 @@ def to_keras_layers(layer: HLayerBase | PLayerBase, name: str) -> tuple[keras.la
                 activation_name = activation.__name__
             activation_layer = keras.layers.Activation(activation, name=f'{name}_{activation_name}')
             conf['activation'] = 'linear'
-    layer_cls = getattr(keras.layers, layer.__class__.__name__[1:])
+    cls_name = layer.__class__.__name__[1:]
+    if hasattr(keras.layers, cls_name):
+        layer_cls = getattr(keras.layers, cls_name)
+    elif hasattr(keras.layers, cls_name.replace('Batchnorm', '')):
+        layer_cls = getattr(keras.layers, cls_name.replace('Batchnorm', ''))
+    else:
+        raise RuntimeError(f'Unknown layer type {layer.__class__.__name__}: no corresponding keras layer found.')
     klayer = layer_cls.from_config(conf)
     klayer.build(layer.input_shape)
     copy_fused_weights(layer, klayer)
@@ -185,10 +196,8 @@ def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = 
         name = namer.next_name(layer.name)
     else:
         name = layer.name
-    proxy_layers = ()
     proxy_quantizer_layers = ()
-    if hasattr(keras.layers, layer.__class__.__name__[1:]):
-        proxy_layers = to_keras_layers(layer, name)
+    proxy_layers = to_keras_layers(layer, name)
     if hasattr(layer, 'pre_activation_quantizer'):
         proxy_quantizer_layers = extract_quantizers(layer, name, SAT, accum_bits_bias)
     if len(proxy_layers) > len(proxy_quantizer_layers) and isinstance(layer, HLayerBase):
