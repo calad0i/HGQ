@@ -115,10 +115,10 @@ class HBatchNormBase(HLayerBase):
             self.kernel_quantizer.adapt_bw_bits(self.kernel)
             return
         
-        k = self.kernel
         fbw = tf.identity(self.kernel_quantizer.fbw)
         self.kernel_quantizer.fbw.assign(tf.ones_like(fbw)*32)
         z = self.forward(x, training=False, record_minmax=False)
+        self.kernel_quantizer.fbw.assign(fbw)
         
         var = tf.math.reduce_variance(z, axis=self._reduction_axis)
         scale = self.bn_gamma * tf.math.rsqrt(var + self.epsilon)

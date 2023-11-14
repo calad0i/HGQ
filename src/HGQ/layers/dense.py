@@ -161,7 +161,11 @@ class HDenseBatchnorm(HDense, HBatchNormBase):
     @tf.function(jit_compile=True)
     def bn_train_jit_forward(self, x, training, record_minmax=None):
 
-        kq = self.kernel_quantizer(self.kernel, training, False)  # type: ignore
+        if self.scale:
+            kq = self.kernel
+        else:
+            kq = self.kernel_quantizer(self.kernel, training, False)  # type: ignore
+
         z = tf.matmul(x, kq)
         
         if self.center:
@@ -182,6 +186,7 @@ class HDenseBatchnorm(HDense, HBatchNormBase):
             train_fused_bias = self.bias - mean * scale # type: ignore
             bq = self.pre_activation_quantizer.bias_forward(train_fused_bias, training, self.channel_loc) # type: ignore
             z = tf.nn.bias_add(z, bq) # type: ignore
+
         z = self.pre_activation_quantizer(z, training, record_minmax) # type: ignore
         a = self.activation(z) # type: ignore
 
