@@ -20,7 +20,7 @@ STREAM = False
 def get_arr_container(arr: np.ndarray):
     """ Get the minimal fixed integer that can represent the array (kif format). If the result is greater than ~30, consider that as inf. (Not representable by fixed point with reasonable bitwidth.)"""
     k = arr < 0
-    lf, hf = -64, 64
+    lf, hf = -32, 32
     if np.all(arr == 0):
         warn('All zero array is detected.')
         return 0, 1, 0  # All zero array is special. Though, (u)fixed<0,...> will lead to a crash, thus ufixed<1,...> is used.
@@ -34,6 +34,8 @@ def get_arr_container(arr: np.ndarray):
         else:
             lf = f
     f = int(hf)
+    if hf == 32:
+        warn('Failed to derive fractional bits. Is the array really quantized with less than 32 fp bits?')
     with np.errstate(divide='ignore'):
         i1, i2 = -np.inf, -np.inf
         if (~k).any():
