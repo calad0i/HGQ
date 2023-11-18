@@ -57,10 +57,6 @@ def activation_kif_forward(func:Callable, k:int, i:int, f:int):
 def get_input_kifs(layer:keras.layers.Layer) -> tuple[tuple[int,int,int]|np.ndarray,...]:
     """Get the input bitwidth of a layer, as a tuple of (k, i, f)."""
     parents:keras.layers.Layer|list[keras.layers.Layer] = layer._inbound_nodes[0].inbound_layers
-    
-    # if isinstance(parents, FixedPointQuantizer):
-    #     # Terminal case
-    #     return (parents.result_t_kif,)
 
     # As any layer that *changes* bitwidth will be followed by a quantizer, assume all layers we will meet here are "passive" layers.
     if isinstance(parents, keras.layers.Layer):
@@ -78,7 +74,7 @@ def get_produced_kif(layer: keras.layers.Layer|FixedPointQuantizer) -> tuple[int
         
     kifs = get_input_kifs(layer)
     
-    if len(kifs) == 1:
+    if len(kifs) == 1: # one output layer
         k,i,f = kifs[0]
         if hasattr(layer, 'kernel'):
             w_k,w_i,w_f = get_arr_container(layer.kernel.numpy())
@@ -155,7 +151,7 @@ def merge_precision(available:tuple[int,int,int], request:tuple[int,int,int]):
     """Given available precision and the maximum precision can be accepted by downstream, return the precision should be allocated for the data path."""
     k0,i0,f0 = available
     k1,i1,f1 = request
-    # assert k0==k1, 'A valid proxy model should have both producer and consumer both using signed or unsigned bit.'
+
     k = k0
     i = min(i0,i1)
     f = min(f0,f1)
