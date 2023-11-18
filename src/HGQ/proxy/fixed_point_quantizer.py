@@ -147,6 +147,14 @@ class FixedPointQuantizer(keras.layers.Layer):
     def __init__(self, keep_negative, bits, integers, RND: str = 'TRN', SAT: str = 'WRAP', overrides: dict | None = None, accum_bits_bias=None, **kwargs):
 
         zeros = bits == 0
+
+        if not hasattr(keep_negative, 'shape'):
+            keep_negative = tf.constant([keep_negative], dtype='int8')
+        if not hasattr(bits, 'shape'):
+            bits = tf.constant([bits], dtype='int8')
+        if not hasattr(integers, 'shape'):
+            integers = tf.constant([integers], dtype='int8')
+
         keep_negative = tf.where(zeros, tf.zeros_like(keep_negative), keep_negative)
         integers = tf.where(zeros, tf.zeros_like(integers), integers)
         self.keep_negative = tf.Variable(keep_negative, dtype='int8', name='keep_negative', trainable=False)
