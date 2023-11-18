@@ -1,5 +1,8 @@
+from collections.abc import Callable
+
 import numpy as np
 import tensorflow as tf
+from keras.activations import linear, relu
 
 from ..quantizer import HGQ
 from ..utils import apf_to_tuple, get_default_kernel_quantizer_config, get_default_pre_activation_quantizer_config, tuple_to_apf, warn
@@ -42,6 +45,15 @@ class HLayerBase(ABSBaseLayer):
         self._has_last_layer = False
         self._do_adapt_kernel_bits = kwargs.pop('do_adapt_kernel_bits', True)
         self._delayed_kernel_bits_adaption = False
+
+        activation = kwargs.get('activation', None)
+        if activation is not None and type(self).__name__ != 'HActivation':
+            if isinstance(activation, str):
+                activation = activation.lower()
+            elif isinstance(activation, Callable):
+                activation = activation.__name__.lower()
+            assert activation in ['relu', 'linear'], f'activation other than relu and linear are only supported for HActivation layer, but is defined for {type(self).__name__} layer.'
+
         super().__init__(**kwargs)
 
     def build(self, input_shape):
