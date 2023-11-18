@@ -1,8 +1,8 @@
 import re
 import sys
+from warnings import warn as _warn
 
 import tensorflow as tf
-from warnings import warn as _warn
 
 
 class L1:

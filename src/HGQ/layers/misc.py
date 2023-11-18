@@ -1,13 +1,14 @@
-from typing import Callable
+from collections.abc import Callable
+
 import tensorflow as tf
+from keras import activations
+from keras.saving import register_keras_serializable
+from keras.src.layers.merging.base_merge import _Merge
+from tensorflow.python.ops.nn_ops import leaky_relu, relu6
 
 from ..layers.base import HLayerBase
 from ..utils import apf_to_tuple, tuple_to_apf
 
-from keras.saving import register_keras_serializable
-from keras.src.layers.merging.base_merge import _Merge
-from keras import activations
-from tensorflow.python.ops.nn_ops import relu6, leaky_relu
 
 @register_keras_serializable(package="HGQ")
 class HQuantize(HLayerBase):
@@ -38,15 +39,15 @@ class HActivation(HLayerBase, tf.keras.layers.Activation):
         if self.pre_activation_quantizer_config['rnd_strategy'] not in ('floor', 3):
             # Jit when using standard round. Very unlikely to have errors.
             self.forward: Callable = tf.function(jit_compile=True)(self.__forward)  # type: ignore
-            
+
         elif self.activation in (activations.relu, activations.linear, relu6, leaky_relu):
             # tf 213 scatters everthing around. Terrible design choice.
             # Jit when activation is more or less linear.
             self.forward: Callable = tf.function(jit_compile=True)(self.__forward)  # type: ignore
-    
+
         else:
             self.forward: Callable = self.__forward
-    
+
         super().post_build(input_shape)
 
     # @tf.function(jit_compile=True)

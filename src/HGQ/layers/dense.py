@@ -5,6 +5,7 @@ from keras.saving import register_keras_serializable
 from .base import HLayerBase
 from .batchnorm_base import HBatchNormBase
 
+
 @register_keras_serializable(package="HGQ")
 class HDense(HLayerBase, tf.keras.layers.Dense):
     def __init__(
@@ -77,7 +78,7 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
 
 
 class HDenseBatchNorm(HDense, HBatchNormBase):
-    
+
     def __init__(
         self,
         units,
@@ -135,11 +136,11 @@ class HDenseBatchNorm(HDense, HBatchNormBase):
             beta_constraint=beta_constraint,
             gamma_constraint=gamma_constraint,
             **kwargs,
-    )
+        )
         self._delayed_kernel_bits_adaption = True
-    
+
     def forward(self, x, training=None, record_minmax=None):
-        
+
         if training and self._do_adapt_kernel_bits and self._delayed_kernel_bits_adaption:
             self.adapt_fused_bn_kernel_bw_bits(x)
             self._do_adapt_kernel_bits = False
@@ -148,7 +149,7 @@ class HDenseBatchNorm(HDense, HBatchNormBase):
             a, kq = self.bn_train_jit_forward(x, True, record_minmax=record_minmax)  # type: ignore
         else:
             a, kq = self.jit_forward(x, False, record_minmax=record_minmax)  # type: ignore
-        
+
         input_bw = self.input_bw
         if input_bw is not None:
             kernel_bw = self._kernel_bw(kq)  # type: ignore
@@ -157,7 +158,7 @@ class HDenseBatchNorm(HDense, HBatchNormBase):
             bops = tf.cast(bops, tf.float32) * self.beta
             self.add_loss(tf.convert_to_tensor(bops))
         return a
-    
+
     @tf.function(jit_compile=True)
     def bn_train_jit_forward(self, x, training, record_minmax=None):
 
@@ -167,11 +168,11 @@ class HDenseBatchNorm(HDense, HBatchNormBase):
             kq = self.kernel_quantizer(self.kernel, training, False)  # type: ignore
 
         z = tf.matmul(x, kq)
-        
+
         if self.center:
             mean = tf.math.reduce_mean(z, axis=self._reduction_axis) + self.bias
             self.moving_mean.assign(self.momentum * self.moving_mean + (1 - self.momentum) * mean)
-                    
+
         if self.scale:
             var = tf.math.reduce_variance(z, axis=self._reduction_axis)
             self.moving_variance.assign(self.momentum * self.moving_variance + (1 - self.momentum) * var)
@@ -181,13 +182,13 @@ class HDenseBatchNorm(HDense, HBatchNormBase):
             z = tf.matmul(x, kq)
         else:
             scale = tf.constant(1.0, dtype=self.dtype)
-        
-        if self.center:
-            train_fused_bias = self.bias - mean * scale # type: ignore
-            bq = self.pre_activation_quantizer.bias_forward(train_fused_bias, training, self.channel_loc) # type: ignore
-            z = tf.nn.bias_add(z, bq) # type: ignore
 
-        z = self.pre_activation_quantizer(z, training, record_minmax) # type: ignore
-        a = self.activation(z) # type: ignore
+        if self.center:
+            train_fused_bias = self.bias - mean * scale  # type: ignore
+            bq = self.pre_activation_quantizer.bias_forward(train_fused_bias, training, self.channel_loc)  # type: ignore
+            z = tf.nn.bias_add(z, bq)  # type: ignore
+
+        z = self.pre_activation_quantizer(z, training, record_minmax)  # type: ignore
+        a = self.activation(z)  # type: ignore
 
         return a, kq

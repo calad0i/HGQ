@@ -1,11 +1,9 @@
-import numpy as np
-import tensorflow as tf
 from functools import singledispatchmethod
 
-from .utils import strategy_dict, L1, L2, L1L2
+import numpy as np
+import tensorflow as tf
 
-
-
+from .utils import L1, L1L2, L2, strategy_dict
 
 two = tf.constant(2, dtype=tf.float32)
 log2 = tf.constant(np.log(2), dtype=tf.float32)
@@ -36,7 +34,8 @@ def q_round(x: tf.Tensor, strategy: int = 0):
         return tf.floor(x)
     raise ValueError(f"Unknown strategy {strategy}")
 
-def get_arr_bits(arr:np.ndarray):
+
+def get_arr_bits(arr: np.ndarray):
     kn = (arr < 0).astype(np.int8)
     """Internal helper function to compute the position of the highest and lowest bit of an array of fixed-point integers."""
     mul = 32  # type: ignore
@@ -51,12 +50,13 @@ def get_arr_bits(arr:np.ndarray):
     int_bits = high_pos - low_pos - fb
     return kn.astype(np.int8), int_bits.astype(np.int8), fb.astype(np.int8)
 
+
 class HGQ:
     def __init__(self, init_bw: float, skip_dims, rnd_strategy: str | int = 'floor', exact_q_value=True, dtype=None, bw_clip=(-23, 23), trainable=True, regularizer=None, minmax_record=False):
         self.init_bw = init_bw
         self.skip_dims = skip_dims
         """tuple: Dimensions to use uniform quantizer. If None, use full heterogenous quantizer."""
-        self.rnd_strategy = strategy_dict.get(rnd_strategy,-1) if isinstance(rnd_strategy, str) else rnd_strategy
+        self.rnd_strategy = strategy_dict.get(rnd_strategy, -1) if isinstance(rnd_strategy, str) else rnd_strategy
         """How to round the quantized value. 0: standard round (default, round to nearest, round-up 0.5), 1: stochastic round, 2: fast uniform noise injection (uniform noise in [-0.5, 0.5]), 3: floor"""
         self.exact_q_value = exact_q_value
         """bool: Whether to use exact quantized value during training."""
@@ -86,7 +86,7 @@ class HGQ:
             elif self.skip_dims == 'except_1st':
                 self.skip_dims = (0,) + tuple(range(2, len(input_shape)))
             else:
-                raise ValueError('skip_dims must be tuple or str in ["all", "except_last", "batch", "except_last", "none"]')            
+                raise ValueError('skip_dims must be tuple or str in ["all", "except_last", "batch", "except_last", "none"]')
         _input_shape = list(input_shape)
         degeneracy = 1
         if self.skip_dims:
@@ -241,15 +241,15 @@ class HGQ:
                     int_bits = np.floor(np.log2(_ref)) + 1
                     kn = np.zeros_like(self._max)
                 else:
-                    int_bits = np.floor(np.log2(np.maximum(np.abs(self._max),np.abs(self._min)))) + 1 # type:ignore
+                    int_bits = np.floor(np.log2(np.maximum(np.abs(self._max), np.abs(self._min)))) + 1  # type:ignore
                     kn = (self._min.numpy() < 0)  # type:ignore
-            int_bits = np.clip(int_bits, -fp_bits-kn, 32)
+            int_bits = np.clip(int_bits, -fp_bits - kn, 32)
             return int_bits.astype(np.int8), fp_bits.astype(np.int8), kn.astype(np.int8)
 
         assert ref is not None
         w = self.forward(ref).numpy()  # type: ignore
-        k,i,f = get_arr_bits(w)
-        return i,f,k
+        k, i, f = get_arr_bits(w)
+        return i, f, k
 
     def adapt_bw_bits(self, ref: tf.Tensor):
         """Adapt the bitwidth of the quantizer to the input tensor, such that each input is represented with approximately the same number of bits. (i.e., 1.5 with be represented by ap_fixed<2,1> and 0.375 will be represented by ap_fixed<2,-2>)."""
@@ -261,5 +261,5 @@ class HGQ:
         self.fbw.assign(new_fbw)
 
     @classmethod
-    def from_config(cls, config:dict):
+    def from_config(cls, config: dict):
         return cls(**config)

@@ -1,16 +1,13 @@
-from typing import Callable
-
-import tensorflow as tf
-from keras import backend as K
+from collections.abc import Callable
+from warnings import warn
 
 import numpy as np
 import tensorflow as tf
-from tensorflow import keras
 from keras import backend as K
-
-from warnings import warn
+from tensorflow import keras
 
 # Nice figure (Figure. 2 and 3) from https://www.researchgate.net/publication/226964494_Formalization_of_Fixed-Point_Arithmetic_in_HOL to illustrate the rounding and saturation modes.
+
 
 def TRN(x):
     # Truncate towards negative infinity. Fast. Preferred when possible.
@@ -148,7 +145,7 @@ def fixed(bits, integer_bits, RND='TRN', SAT='WRAP') -> Callable:
 class FixedPointQuantizer(keras.layers.Layer):
 
     def __init__(self, keep_negative, bits, integers, RND: str = 'TRN', SAT: str = 'WRAP', overrides: dict | None = None, accum_bits_bias=None, **kwargs):
-        
+
         zeros = bits == 0
         keep_negative = tf.where(zeros, tf.zeros_like(keep_negative), keep_negative)
         integers = tf.where(zeros, tf.zeros_like(integers), integers)
@@ -186,7 +183,7 @@ class FixedPointQuantizer(keras.layers.Layer):
         if len(last_layer._outbound_nodes) != 1:
             return False
         return not self.heterogeneous
-    
+
     @property
     def heterogeneous(self):
         k0, b0, i0 = tf.reduce_max(self.keep_negative), tf.reduce_max(self.bits), tf.reduce_max(self.integers)

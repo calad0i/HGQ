@@ -1,10 +1,9 @@
 import numpy as np
 import tensorflow as tf
-
-from keras.src.layers.pooling.base_pooling2d import Pooling2D
-from keras.src.layers.pooling.base_pooling1d import Pooling1D
-from keras.src.utils import conv_utils
 from keras.saving import register_keras_serializable
+from keras.src.layers.pooling.base_pooling1d import Pooling1D
+from keras.src.layers.pooling.base_pooling2d import Pooling2D
+from keras.src.utils import conv_utils
 
 from ..utils import apf_to_tuple, tuple_to_apf
 
@@ -18,7 +17,7 @@ class PLayerBase(tf.keras.layers.Layer):
 
     @property
     def last_layer(self):
-        assert len(self._inbound_nodes) ==1, f'input_container is only available for layers used only once. {self.name} is used {len(self._inbound_nodes)} times.'
+        assert len(self._inbound_nodes) == 1, f'input_container is only available for layers used only once. {self.name} is used {len(self._inbound_nodes)} times.'
         assert not isinstance(self._inbound_nodes[0].inbound_layers, list), f'input_container is only available for layers with a single input. {self.name} has {len(self._inbound_nodes[0].inbound_layers)} inputs.'
         return self._inbound_nodes[0].inbound_layers
 
@@ -175,6 +174,7 @@ PMaxPool2D = PMaxPooling2D
 PAvgPool2D = PAveragePooling2D
 PMaxPool1D = PMaxPooling1D
 PAvgPool1D = PAveragePooling1D
+
 
 @register_keras_serializable(package="HGQ")
 class PDropout(PLayerBase, tf.keras.layers.Dropout):

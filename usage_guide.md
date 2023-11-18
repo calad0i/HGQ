@@ -17,7 +17,7 @@ from HGQ.hls4ml_hook import convert_from_hgq_model
 ....
 
 #regularization factor on MBOPs, higher for smaller bitwidth
-beta = 1e-5 
+beta = 1e-5
 
 # The first layer must be quantized, either by using HQuantize or Signature layers. String 'q_inp' must be in the name of the input quantization layers.
 # The input quantization layer's name must contain 'inp_q' or 'h_quantize' if you want to quantize the input heterogeneously.
@@ -69,7 +69,7 @@ DEFAULT_KERNEL_QUANTIZER_CONFIG = \
          # initial bitwidth for the floating part
          init_bw=2,
          # Which dimensions to quantize homogeneously. Accept a tuple of integers, or any of ['all', 'batch', 'none', 'except_last', 'except_1st'].
-         skip_dims=None, 
+         skip_dims=None,
          # How rounding is performed in training. Can choose from ['floor', 'standard_round', 'stochastic_round', 'fast_uniform_noise_injection', 'auto'].
          # In testing, 'standard_round' is used for everything except for 'floor'.
          # 'auto': Use 'standard_round' for HActivation layers and layers with a bias for each activation quantization bin, floor otherwise.
@@ -89,7 +89,7 @@ DEFAULT_KERNEL_QUANTIZER_CONFIG = \
 DEFAULT_PRE_ACTIVATION_QUANTIZER_CONFIG = \
     dict(init_bw=2,
          skip_dims=(0,), # Same to 'batch'. skipping the batch dimension, which should always be homogeneously quantized.
-         rnd_strategy='standard_round',  
+         rnd_strategy='standard_round',
          exact_q_value=False,
          dtype=None,
          bw_clip=(-23, 23),

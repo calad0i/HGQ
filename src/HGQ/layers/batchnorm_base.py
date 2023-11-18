@@ -1,7 +1,9 @@
 import tensorflow as tf
-from tensorflow import keras
 from keras.src.utils import tf_utils
+from tensorflow import keras
+
 from .base import HLayerBase
+
 
 class HBatchNormBase(HLayerBase):
     def __init__(
@@ -42,22 +44,22 @@ class HBatchNormBase(HLayerBase):
 
     def post_build(self, input_shape):
         super().post_build(input_shape)
-        self.axis:list = tf_utils.validate_axis(self.axis, input_shape)
-        self._post_build(input_shape) # type: ignore
+        self.axis: list = tf_utils.validate_axis(self.axis, input_shape)
+        self._post_build(input_shape)  # type: ignore
 
     def _post_build(self, input_shape):
         self._reduction_axis = tuple([i for i in range(len(input_shape)) if i not in self.axis])
         output_shape = self.compute_output_shape(input_shape)
         shape = tuple([output_shape[i] for i in self.axis])
         if self.center:
-            self.bn_beta:tf.Variable = self.add_weight(
+            self.bn_beta: tf.Variable = self.add_weight(
                 name="bn_beta",
                 shape=shape,
                 initializer=self.beta_initializer,
                 regularizer=self.beta_regularizer,
                 constraint=self.beta_constraint,
             )
-            self.moving_mean:tf.Variable = self.add_weight(
+            self.moving_mean: tf.Variable = self.add_weight(
                 name="moving_mean",
                 shape=shape,
                 initializer=self.moving_mean_initializer,
@@ -66,14 +68,14 @@ class HBatchNormBase(HLayerBase):
         else:
             self.bn_beta = self.moving_mean = tf.Variable(0.0, trainable=False)
         if self.scale:
-            self.bn_gamma:tf.Variable = self.add_weight(
+            self.bn_gamma: tf.Variable = self.add_weight(
                 name="bn_gamma",
                 shape=shape,
                 initializer=self.gamma_initializer,
                 regularizer=self.gamma_regularizer,
                 constraint=self.gamma_constraint,
             )
-            self.moving_variance:tf.Variable = self.add_weight(
+            self.moving_variance: tf.Variable = self.add_weight(
                 name="moving_variance",
                 shape=shape,
                 initializer=self.moving_variance_initializer,
@@ -81,18 +83,18 @@ class HBatchNormBase(HLayerBase):
             )
         else:
             self.bn_gamma = self.moving_variance = tf.Variable(1.0, trainable=False)
-    
+
     @tf.function(jit_compile=True)
     def update_ema(self, z):
         """z is the final output AFTER batchnorm. Thus, it is necessary to undo the batchnorm to get the original input, compute the mean and variance, and then update the ema"""
-        
+
         if self.scale:
             batch_var = tf.math.reduce_variance(z, axis=0)
             self.moving_variance.assign(self.momentum * self.moving_variance + (1 - self.momentum) * batch_var)
         if self.center:
             batch_mean = tf.math.reduce_mean(z, axis=0)
             self.moving_mean.assign(self.momentum * self.moving_mean + (1 - self.momentum) * batch_mean)
-    
+
     @property
     @tf.function(jit_compile=True)
     def fused_kernel(self):
@@ -100,7 +102,7 @@ class HBatchNormBase(HLayerBase):
             return self.kernel
         scale = self.bn_gamma * tf.math.rsqrt(self.moving_variance + self.epsilon)
         return self.kernel * scale
-    
+
     @property
     @tf.function(jit_compile=True)
     def fused_bias(self):
@@ -108,18 +110,18 @@ class HBatchNormBase(HLayerBase):
             return self.bias
         scale = self.bn_gamma * tf.math.rsqrt(self.moving_variance + self.epsilon)
         return self.bias - self.moving_mean * scale
-    
+
     def adapt_fused_bn_kernel_bw_bits(self, x: tf.Tensor):
         """Adapt the bitwidth of the kernel quantizer to the input tensor, such that each input is represented with approximately the same number of bits after fused batchnormalization."""
         if not self.scale:
             self.kernel_quantizer.adapt_bw_bits(self.kernel)
             return
-        
+
         fbw = tf.identity(self.kernel_quantizer.fbw)
-        self.kernel_quantizer.fbw.assign(tf.ones_like(fbw)*32)
+        self.kernel_quantizer.fbw.assign(tf.ones_like(fbw) * 32)
         z = self.forward(x, training=False, record_minmax=False)
         self.kernel_quantizer.fbw.assign(fbw)
-        
+
         var = tf.math.reduce_variance(z, axis=self._reduction_axis)
         scale = self.bn_gamma * tf.math.rsqrt(var + self.epsilon)
         fused_kernel = self.kernel * scale

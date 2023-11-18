@@ -1,13 +1,13 @@
 import numpy as np
 import tensorflow as tf
-from tensorflow import keras
 from keras.src.engine.node import Node
 from keras.src.layers.convolutional.base_conv import Conv as BaseConv
+from tensorflow import keras
 
-from .fixed_point_quantizer import FixedPointQuantizer
-from ..layers import HLayerBase, PLayerBase, Signature, PDropout, HQuantize
-from .precision_derivation import register_qconf
+from ..layers import HLayerBase, HQuantize, PDropout, PLayerBase, Signature
 from ..utils import warn
+from .fixed_point_quantizer import FixedPointQuantizer
+from .precision_derivation import register_qconf
 
 
 def get_all_nodes(model: keras.Model) -> set[Node]:
@@ -84,6 +84,7 @@ def copy_fused_weights(src: keras.layers.Layer, dst: keras.layers.Layer):
 
 class Namer:
     """Helper class to generate unique names for layers, if one being used multiple times."""
+
     def __init__(self):
         self.used_names: set[str] = set()
 
@@ -99,7 +100,7 @@ class Namer:
 
 def extract_keras_layers(layer: HLayerBase | PLayerBase, name: str) -> tuple[keras.layers.Layer, ...]:
     """Given a HGQ layer, return a tuple of keras layers in corresponding order. The tuple may be empty if the layer is a quantizer, or containing only the corresponding layer if the layer is an activation or does not have a non-linear activation, or containing the corresponding layer and the activation layer otherwise.
-    
+
     Example:
         HQuantize -> ()
         HDense[linaer] -> (Dense,)
@@ -189,6 +190,7 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', acc
 
     return layer_quantizer, relu_quantizer
 
+
 def to_proxy_layers(layer: keras.layers.Layer, name, SAT: str, accum_bits_bias: int | None):
     """Given a HGQ-competible layer, return a tuple of keras layers and quantizers that are equivalent to the layer when applied in order. (When it doesn't overflow, and up to fp precision)"""
     proxy_quantizer_layers = ()
@@ -205,6 +207,7 @@ def to_proxy_layers(layer: keras.layers.Layer, name, SAT: str, accum_bits_bias: 
         if proxy_quantizer_layers:
             layers.append(proxy_quantizer_layers.pop(0))
     return layers
+
 
 SKIP_LAYERS = (PDropout,)
 
@@ -224,14 +227,14 @@ def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = 
 
 def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits_bias: int | None = None):
     """Given a HGQ model, return a hls4ml-ready keras model.
-    
+
     Args:
         model: The HGQ model to be converted.
-        
+
         aggressive (default: True): If True, use WRAP overflow mode. Sigificant performance degradation may occur if overflow occurs, but latency may be reduced. If False, use SAT overflow mode. Performance is more stable when it overflows, but latency may be increased.
 
         accum_bits_bias (default: None): If not None, autoset accumlator such that the model is bit accurate (when no overflow occurs and up to fp precision). If set, use the specified number of floating bits plus result float bits as accumlator float bits. May improve latency in some rare cases, not recommended in general.
-    
+
     """
     input_nodes, output_nodes, dependencies_list = solve_dependencies(model)
 

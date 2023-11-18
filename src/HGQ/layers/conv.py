@@ -1,12 +1,12 @@
 from functools import partialmethod
 
 import tensorflow as tf
-from keras.src.layers.convolutional.base_conv import Conv
 from keras.saving import register_keras_serializable
+from keras.src.layers.convolutional.base_conv import Conv
 
+from ..utils import warn
 from .base import HLayerBase
 from .batchnorm_base import HBatchNormBase
-from ..utils import warn
 
 
 class HConv(HLayerBase, Conv):
@@ -135,6 +135,7 @@ class HConv(HLayerBase, Conv):
         self.bops.assign(tf.constant(bops, dtype=tf.float32))
         return bops
 
+
 @register_keras_serializable(package="HGQ")
 class HConv2D(HConv):
     def __init__(
@@ -246,6 +247,7 @@ class HConv1D(HConv):
             **kwargs,
         )
 
+
 class HConvBatchNorm(HConv, HBatchNormBase):
     def __init__(
         self,
@@ -339,7 +341,7 @@ class HConvBatchNorm(HConv, HBatchNormBase):
             a, kq = self.bn_train_jit_forward(x, True, record_minmax=record_minmax)  # type: ignore
         else:
             a, kq = self.jit_forward(x, False, record_minmax=record_minmax)  # type: ignore
-        
+
         input_bw = self.input_bw
         if input_bw is not None:
             kernel_bw = self._kernel_bw(kq)  # type: ignore
@@ -350,7 +352,6 @@ class HConvBatchNorm(HConv, HBatchNormBase):
             self.add_loss(tf.convert_to_tensor(bops))
         return a
 
-
     @tf.function(jit_compile=True)
     def bn_train_jit_forward(self, x, training, record_minmax=None):
 
@@ -359,32 +360,32 @@ class HConvBatchNorm(HConv, HBatchNormBase):
         else:
             kq = self.kernel_quantizer(self.kernel, training, False)  # type: ignore
 
-        z = self.convolution_op(x, kq) # type: ignore
-        
+        z = self.convolution_op(x, kq)  # type: ignore
+
         if self.center:
             mean = tf.math.reduce_mean(z, axis=self._reduction_axis) + self.bias
             self.moving_mean.assign(self.momentum * self.moving_mean + (1 - self.momentum) * mean)
-                    
+
         if self.scale:
             var = tf.math.reduce_variance(z, axis=self._reduction_axis)
             self.moving_variance.assign(self.momentum * self.moving_variance + (1 - self.momentum) * var)
             scale = self.bn_gamma * tf.math.rsqrt(var + self.epsilon)
             train_fused_kernel = self.kernel * scale
             kq = self.kernel_quantizer(train_fused_kernel, training, False)  # type: ignore
-            z = self.convolution_op(x, kq) # type: ignore
+            z = self.convolution_op(x, kq)  # type: ignore
         else:
             scale = tf.constant(1.0, dtype=self.dtype)
-        
-        if self.center:
-            train_fused_bias = self.bias - mean * scale # type: ignore
-            bq = self.pre_activation_quantizer.bias_forward(train_fused_bias, training, self.channel_loc) # type: ignore
-            z = tf.nn.bias_add(z, bq, data_format=self._tf_data_format) # type: ignore
 
-        z = self.pre_activation_quantizer(z, training, record_minmax) # type: ignore
-        a = self.activation(z) # type: ignore
+        if self.center:
+            train_fused_bias = self.bias - mean * scale  # type: ignore
+            bq = self.pre_activation_quantizer.bias_forward(train_fused_bias, training, self.channel_loc)  # type: ignore
+            z = tf.nn.bias_add(z, bq, data_format=self._tf_data_format)  # type: ignore
+
+        z = self.pre_activation_quantizer(z, training, record_minmax)  # type: ignore
+        a = self.activation(z)  # type: ignore
 
         return a, kq
-    
+
 
 @register_keras_serializable(package="HGQ")
 class HConv2DBatchNorm(HConvBatchNorm):
@@ -466,6 +467,7 @@ class HConv2DBatchNorm(HConvBatchNorm):
             gamma_constraint=gamma_constraint,
             **kwargs,
         )
+
 
 @register_keras_serializable(package="HGQ")
 class HConv1DBatchNorm(HConvBatchNorm):

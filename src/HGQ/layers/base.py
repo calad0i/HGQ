@@ -2,9 +2,8 @@ import numpy as np
 import tensorflow as tf
 
 from ..quantizer import HGQ
-from ..utils import get_default_kernel_quantizer_config, get_default_pre_activation_quantizer_config
-from ..utils import apf_to_tuple, tuple_to_apf
-from ..utils import warn
+from ..utils import apf_to_tuple, get_default_kernel_quantizer_config, get_default_pre_activation_quantizer_config, tuple_to_apf, warn
+
 
 @staticmethod  # type: ignore
 @tf.function(jit_compile=True)
@@ -37,19 +36,19 @@ class HLayerBase(tf.keras.layers.Layer):
     def can_bias_cover_rnd(self):
         if not self._has_bias:
             return False
-        quantizer_shape:tuple[int,...] = tuple(self.pre_activation_quantizer.fbw.shape)
-        bias_shape:tuple[int,...] = tuple(self.bias.shape)
+        quantizer_shape: tuple[int, ...] = tuple(self.pre_activation_quantizer.fbw.shape)
+        bias_shape: tuple[int, ...] = tuple(self.bias.shape)
         if len(bias_shape) != 1:
             warn(f'bias shape {bias_shape} is not supported.')
             return False
         if np.prod(quantizer_shape) == 1:
             return True
-        if self.channel_loc==-1:
+        if self.channel_loc == -1:
             return np.prod(quantizer_shape[:-1]) == 1 and bias_shape == quantizer_shape[-1:]
-        elif self.channel_loc==1:
+        elif self.channel_loc == 1:
             return np.prod(quantizer_shape[1:]) == 1 and bias_shape == quantizer_shape[0:1]
         return False
-        
+
     def post_build(self, input_shape):
         """This method should be called after calling build() method of the child class. It initializes the quantizers and sets the bops variable, and set a few flags (_has_kernel, _has_bias, _relu_act) for convenience.)"""
         self._has_kernel = False
@@ -64,10 +63,9 @@ class HLayerBase(tf.keras.layers.Layer):
         if not hasattr(self, 'channel_loc'):
             self.channel_loc = -1
         if self.pre_activation_quantizer_config['rnd_strategy'] == 'auto':
-            self.pre_activation_quantizer.rnd_strategy =  0 if self.can_bias_cover_rnd else 3
-        
-        self.bops = tf.Variable(0, dtype=tf.float32, trainable=False, name='bops')
+            self.pre_activation_quantizer.rnd_strategy = 0 if self.can_bias_cover_rnd else 3
 
+        self.bops = tf.Variable(0, dtype=tf.float32, trainable=False, name='bops')
 
     def init_quantizers(self, input_shape):
         """Initializes the High Granularity Quantizers for the kernel and the pre-activation values. This method is called by post_build() method."""
@@ -163,7 +161,7 @@ class HLayerBase(tf.keras.layers.Layer):
     @property
     def fused_bias(self):
         return self.bias
-    
+
     @property
     def fused_kernel(self):
         return self.kernel
@@ -178,8 +176,8 @@ class HLayerBase(tf.keras.layers.Layer):
     @tf.function(jit_compile=True)
     def fused_qbias(self):
         """Returns the final, quantized bias for deployment. non-differentiable, should not be used for training. When using rounding to nearest and the bias can cover the rounding error, bias is pre-biased to cover the rounding shift 2^-fbw, and then TRN can be used instead RND without any loss of accuracy."""
-        bias = self.pre_activation_quantizer.bias_forward(self.fused_bias, False, self.channel_loc) # type: ignore
-        
+        bias = self.pre_activation_quantizer.bias_forward(self.fused_bias, False, self.channel_loc)  # type: ignore
+
         if bias is None:
             return None
 
@@ -212,7 +210,7 @@ class HLayerBase(tf.keras.layers.Layer):
 
     @property
     def last_layer(self):
-        assert len(self._inbound_nodes) ==1, f'input_container is only available for layers used only once. {self.name} is used {len(self._inbound_nodes)} times.'
+        assert len(self._inbound_nodes) == 1, f'input_container is only available for layers used only once. {self.name} is used {len(self._inbound_nodes)} times.'
         assert not isinstance(self._inbound_nodes[0].inbound_layers, list), f'input_container is only available for layers with a single input. {self.name} has {len(self._inbound_nodes[0].inbound_layers)} inputs.'
         return self._inbound_nodes[0].inbound_layers
 
@@ -221,11 +219,10 @@ class HLayerBase(tf.keras.layers.Layer):
         config = dict(
             kernel_quantizer_config=self.kernel_quantizer_config,
             pre_activation_quantizer_config=self.pre_activation_quantizer_config,
-            beta=float(self.beta.numpy()) # type: ignore
+            beta=float(self.beta.numpy())  # type: ignore
         )
         return {**base_config, **config}
 
     def get_keras_config(self):
         config = super().get_config()
         return config
-        
