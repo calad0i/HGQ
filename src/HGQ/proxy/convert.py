@@ -196,16 +196,19 @@ def to_proxy_layers(layer: keras.layers.Layer, name, SAT: str, accum_bits_bias: 
     proxy_quantizer_layers = ()
     layers = []
     proxy_layers = list(extract_keras_layers(layer, name))
+
     if hasattr(layer, 'pre_activation_quantizer'):
         proxy_quantizer_layers = list(extract_quantizers(layer, name, SAT, accum_bits_bias))
     if len(proxy_layers) > len(proxy_quantizer_layers) and isinstance(layer, HLayerBase):
         warn(f'Layer {layer.name} does not have a quantizer attached!')
-    assert proxy_layers or proxy_quantizer_layers, f'Failed to convert layer {layer.name}: layer not mapped to anything.'
+
     while proxy_layers or proxy_quantizer_layers:
         if proxy_layers:
             layers.append(proxy_layers.pop(0))
         if proxy_quantizer_layers:
             layers.append(proxy_quantizer_layers.pop(0))
+
+    assert layers, f'Failed to convert layer {layer.name}: layer not mapped to anything.'
     return layers
 
 

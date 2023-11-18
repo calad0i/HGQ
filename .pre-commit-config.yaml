@@ -1,0 +1,42 @@
+repos:
+- repo: https://github.com/hhatto/autopep8
+  rev: v2.0.4
+  hooks:
+  - id: autopep8
+    language_version: python3
+    args: ['--max-line-length=65535',
+           '--ignore=E731',
+           '--ignore=E402',
+           '--in-place',
+           ]
+
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.5.0
+  hooks:
+  - id: check-added-large-files
+  - id: check-case-conflict
+  - id: check-merge-conflict
+  - id: check-symlinks
+  - id: check-yaml
+  - id: debug-statements
+  - id: end-of-file-fixer
+  - id: mixed-line-ending
+  - id: requirements-txt-fixer
+  - id: trailing-whitespace
+
+- repo: https://github.com/asottile/setup-cfg-fmt
+  rev: v2.5.0
+  hooks:
+  - id: setup-cfg-fmt
+
+- repo: https://github.com/asottile/pyupgrade
+  rev: v3.15.0
+  hooks:
+  - id: pyupgrade
+    args: ["--py310-plus"]
+
+- repo: https://github.com/PyCQA/isort
+  rev: 5.12.0
+  hooks:
+  - id: isort
+    args: ['--line-length=65535']
