@@ -6,20 +6,15 @@ from keras.src.layers.pooling.base_pooling2d import Pooling2D
 from keras.src.utils import conv_utils
 
 from ..utils import apf_to_tuple, tuple_to_apf
+from .base import ABSBaseLayer
 
 
 @register_keras_serializable(package="HGQ")
-class PLayerBase(tf.keras.layers.Layer):
+class PLayerBase(ABSBaseLayer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._has_last_layer = False
-
-    @property
-    def last_layer(self):
-        assert len(self._inbound_nodes) == 1, f'input_container is only available for layers used only once. {self.name} is used {len(self._inbound_nodes)} times.'
-        assert not isinstance(self._inbound_nodes[0].inbound_layers, list), f'input_container is only available for layers with a single input. {self.name} has {len(self._inbound_nodes[0].inbound_layers)} inputs.'
-        return self._inbound_nodes[0].inbound_layers
 
     @property
     def act_bw(self):
@@ -27,10 +22,6 @@ class PLayerBase(tf.keras.layers.Layer):
         shape = (1,) + self.output_shape[1:]
         input_bw = tf.reshape(self.input_bw, shape)
         return tf.ensure_shape(input_bw, shape)
-
-    @property
-    def input_bw(self):
-        return self.last_layer.act_bw
 
     @property
     def act_container(self) -> str:

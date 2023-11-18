@@ -12,7 +12,23 @@ def scale_grad(x, scale):
     return sx + tf.stop_gradient(x - sx)
 
 
-class HLayerBase(tf.keras.layers.Layer):
+class ABSBaseLayer(tf.keras.layers.Layer):
+
+    @property
+    def last_layer(self):
+        assert len(self._inbound_nodes) == 1, f'input_container is only available for layers used only once. {self.name} is used {len(self._inbound_nodes)} times.'
+        assert not isinstance(self._inbound_nodes[0].inbound_layers, list), f'input_container is only available for layers with a single input. {self.name} has {len(self._inbound_nodes[0].inbound_layers)} inputs.'
+        return self._inbound_nodes[0].inbound_layers
+
+    @property
+    def input_bw(self):
+        try:
+            return self.last_layer.act_bw
+        except AssertionError:
+            return None
+
+
+class HLayerBase(ABSBaseLayer):
     """Abstract base class for all layers in the library. Child classes should call post_build() after calling their build() method.
     """
 
@@ -152,13 +168,6 @@ class HLayerBase(tf.keras.layers.Layer):
         return tf.broadcast_to(bw, (1,) + self.output_shape[1:])
 
     @property
-    def input_bw(self):
-        try:
-            return self.last_layer.act_bw
-        except AssertionError:
-            return None
-
-    @property
     def fused_bias(self):
         return self.bias
 
@@ -207,12 +216,6 @@ class HLayerBase(tf.keras.layers.Layer):
         """Computes the exact bops for the layer. Non-differentiable. For post-training use."""
         self.bops.assign(tf.constant(0.))
         return np.float32(0.)
-
-    @property
-    def last_layer(self):
-        assert len(self._inbound_nodes) == 1, f'input_container is only available for layers used only once. {self.name} is used {len(self._inbound_nodes)} times.'
-        assert not isinstance(self._inbound_nodes[0].inbound_layers, list), f'input_container is only available for layers with a single input. {self.name} has {len(self._inbound_nodes[0].inbound_layers)} inputs.'
-        return self._inbound_nodes[0].inbound_layers
 
     def get_config(self):
         base_config = super().get_config()
