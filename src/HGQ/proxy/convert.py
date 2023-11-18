@@ -11,6 +11,7 @@ from ..utils import warn
 
 
 def get_all_nodes(model: keras.Model) -> set[Node]:
+    """Get all nodes in the model as a set."""
     nodes = set()
     for layer in model.layers:
         for node in layer._inbound_nodes:
@@ -21,6 +22,7 @@ def get_all_nodes(model: keras.Model) -> set[Node]:
 
 
 def solve_dependencies(model: keras.Model):
+    """Given a keras model, return the input nodes, output nodes and a list of (layer, requires, provides) tuples. Requires is a list of nodes that are parents of the layer, provides is the node that is the output of the layer."""
     inp_tensors = model.inputs
     out_tensors = model.outputs
     inp_layers = [tensor._keras_history.layer for tensor in inp_tensors]  # type:ignore
@@ -45,6 +47,7 @@ def solve_dependencies(model: keras.Model):
 
 
 def get_weight(layer: keras.layers.Layer, name: str):
+    """Given a layer and a weight name, return the weight. The weight name may or may not contain the layer name. If the number index is missing, it is assumed to be 0."""
     if '/' in name:
         name = name.split('/')[-1]
     if ':' not in name:
@@ -56,6 +59,7 @@ def get_weight(layer: keras.layers.Layer, name: str):
 
 
 def copy_fused_weights(src: keras.layers.Layer, dst: keras.layers.Layer):
+    """For HGQ layers, some layers may have different fused weights for kernel and bias (Processed weights are deployment). This function copies the fused kernel and bias to the keras proxy."""
     if hasattr(dst, 'kernel'):
         if (k := getattr(src, 'fused_qkernel', None)) is not None:
             dst.kernel.assign(k)
@@ -79,6 +83,7 @@ def copy_fused_weights(src: keras.layers.Layer, dst: keras.layers.Layer):
 
 
 class Namer:
+    """Helper class to generate unique names for layers, if one being used multiple times."""
     def __init__(self):
         self.used_names: set[str] = set()
 
@@ -92,8 +97,15 @@ class Namer:
         return name
 
 
-def to_keras_layers(layer: HLayerBase | PLayerBase, name: str) -> tuple[keras.layers.Layer, ...]:
+def extract_keras_layers(layer: HLayerBase | PLayerBase, name: str) -> tuple[keras.layers.Layer, ...]:
+    """Given a HGQ layer, return a tuple of keras layers in corresponding order. The tuple may be empty if the layer is a quantizer, or containing only the corresponding layer if the layer is an activation or does not have a non-linear activation, or containing the corresponding layer and the activation layer otherwise.
     
+    Example:
+        HQuantize -> ()
+        HDense[linaer] -> (Dense,)
+        HDense[relu] -> (Dense, Activation)
+    """
+
     if isinstance(layer, (HQuantize, Signature)):
         return tuple()
 
@@ -130,6 +142,7 @@ def to_keras_layers(layer: HLayerBase | PLayerBase, name: str) -> tuple[keras.la
 
 
 def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', accum_bits_bias=None) -> tuple[FixedPointQuantizer, ...]:
+    """Given a HGQ layer, return a tuple of quantizers that are used in the layer."""
     if isinstance(layer, Signature):
         return FixedPointQuantizer(layer.keep_negative, layer.bits, layer.int_bits, 'TRN', SAT),
 
@@ -142,18 +155,9 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', acc
     relu_act = layer._relu_act
     overriddes = None
     if layer._has_kernel:
-        if isinstance(layer, keras.layers.Dense):
-            multiplicity = np.prod(layer.kernel.shape) / layer.units
-        elif isinstance(layer, BaseConv):
-            multiplicity = np.prod(layer.kernel.shape) / layer.filters
-        else:
-            multiplicity = 1024
-            warn(f'Unknown layer type {layer.__class__.__name__} to compute accumlation multiplicity for bitgrowth. If you are not using bitgrowth, ignore this warning.')
-        overriddes = {'layers': {name: {'_accum_multiplicity': multiplicity}}}
-
         if hasattr(layer, 'parallel_factor'):
             parallel_factor = int(layer.parallel_factor)
-            overriddes['layers'][name]['parallelization_factor'] = parallel_factor
+            overriddes = {'layers': {name: {'parallelization_factor': parallel_factor}}}
 
     int_bits, fp_bits, kn = quantizer.get_bits_exact(pos_only=False)  # type: ignore
 
@@ -185,37 +189,50 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', acc
 
     return layer_quantizer, relu_quantizer
 
+def to_proxy_layers(layer: keras.layers.Layer, name, SAT: str, accum_bits_bias: int | None):
+    """Given a HGQ-competible layer, return a tuple of keras layers and quantizers that are equivalent to the layer when applied in order. (When it doesn't overflow, and up to fp precision)"""
+    proxy_quantizer_layers = ()
+    layers = []
+    proxy_layers = list(extract_keras_layers(layer, name))
+    if hasattr(layer, 'pre_activation_quantizer'):
+        proxy_quantizer_layers = list(extract_quantizers(layer, name, SAT, accum_bits_bias))
+    if len(proxy_layers) > len(proxy_quantizer_layers) and isinstance(layer, HLayerBase):
+        warn(f'Layer {layer.name} does not have a quantizer attached!')
+    assert proxy_layers or proxy_quantizer_layers, f'Failed to convert layer {layer.name}: layer not mapped to anything.'
+    while proxy_layers or proxy_quantizer_layers:
+        if proxy_layers:
+            layers.append(proxy_layers.pop(0))
+        if proxy_quantizer_layers:
+            layers.append(proxy_quantizer_layers.pop(0))
+    return layers
 
 SKIP_LAYERS = (PDropout,)
 
 
 def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = None, SAT='WRAP', accum_bits_bias=None):
+    """Given a HGQ-competible layer and a tensor, return the output of the layer when applied to the tensor. Used in builing the proxy model."""
     if isinstance(layer, SKIP_LAYERS):
         return tensor
     if namer is not None:
         name = namer.next_name(layer.name)
     else:
         name = layer.name
-    proxy_quantizer_layers = ()
-    proxy_layers = to_keras_layers(layer, name)
-    if hasattr(layer, 'pre_activation_quantizer'):
-        proxy_quantizer_layers = extract_quantizers(layer, name, SAT, accum_bits_bias)
-    if len(proxy_layers) > len(proxy_quantizer_layers) and isinstance(layer, HLayerBase):
-        warn(f'Layer {layer.name} does not have a quantizer attached!')
-    assert proxy_layers or proxy_quantizer_layers, f'Failed to convert layer {layer.name}: layer not mapped to anything.'
-    for l1, l2 in zip(proxy_layers, proxy_quantizer_layers):
-        tensor = l2(l1(tensor))
-    if len(proxy_layers) < len(proxy_quantizer_layers):
-        for l2 in proxy_quantizer_layers[len(proxy_layers):]:
-            tensor = l2(tensor)
-    else:
-        for l1 in proxy_layers[len(proxy_quantizer_layers):]:
-            tensor = l1(tensor)
+    for l in to_proxy_layers(layer, name, SAT, accum_bits_bias):
+        tensor = l(tensor)
     return tensor
 
 
 def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits_bias: int | None = None):
+    """Given a HGQ model, return a hls4ml-ready keras model.
+    
+    Args:
+        model: The HGQ model to be converted.
+        
+        aggressive (default: True): If True, use WRAP overflow mode. Sigificant performance degradation may occur if overflow occurs, but latency may be reduced. If False, use SAT overflow mode. Performance is more stable when it overflows, but latency may be increased.
 
+        accum_bits_bias (default: None): If not None, autoset accumlator such that the model is bit accurate (when no overflow occurs and up to fp precision). If set, use the specified number of floating bits plus result float bits as accumlator float bits. May improve latency in some rare cases, not recommended in general.
+    
+    """
     input_nodes, output_nodes, dependencies_list = solve_dependencies(model)
 
     if accum_bits_bias is not None and not aggressive:
