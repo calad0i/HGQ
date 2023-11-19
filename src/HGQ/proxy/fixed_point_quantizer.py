@@ -1,3 +1,4 @@
+import abc
 from collections.abc import Callable
 from warnings import warn
 
@@ -142,11 +143,7 @@ def fixed(bits, integer_bits, RND='TRN', SAT='WRAP') -> Callable:
     return gfixed(1, bits, integer_bits, RND, SAT)
 
 
-class QuantizerBase(keras.layers.Layer):
-    pass
-
-
-class FixedPointQuantizer(QuantizerBase):
+class FixedPointQuantizer(keras.layers.Layer, metaclass=abc.ABCMeta):
 
     def __init__(self, keep_negative, bits, integers, RND: str = 'TRN', SAT: str = 'WRAP', overrides: dict | None = None, accum_bits_bias=None, **kwargs):
 
@@ -175,7 +172,8 @@ class FixedPointQuantizer(QuantizerBase):
 
         super().__init__(trainable=False, **kwargs)
 
-    def call(self, x):
+    def call(self, x, training=None):
+        assert not training, "Proxy model shall can not be trained!"
         if not self.built:
             self.build(x.shape)
         return gfixed_quantizer(x, self.keep_negative, self.bits, self.integers, self.RND, self.SAT)  # type:ignore
