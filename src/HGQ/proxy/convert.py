@@ -196,7 +196,7 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', acc
 @singledispatch
 def to_proxy_layers(layer, name, SAT: str, accum_bits_bias: int | None):
     """Given a layer, return a tuple of keras layers and quantizers that are equivalent to the layer when applied in order. (When it doesn't overflow, and up to fp precision)"""
-    raise RuntimeError(f'No matching overload for layer type {type(layer)}. Signatures available: {to_proxy_layers.registry.keys()}')
+    raise TypeError(f'No matching overload for layer type {type(layer)}. Signatures available: {to_proxy_layers.registry.keys()}')
 
 
 @to_proxy_layers.register
