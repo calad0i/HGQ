@@ -83,7 +83,19 @@ def get_produced_kif(layer) -> tuple[int, int, int]:
 
 @get_produced_kif.register
 def _(layer: FixedPointQuantizer):
-    return layer.result_t_kif
+    kifs = get_input_kifs(layer)
+    assert len(kifs) == 1, f'Quantizer {layer.name} has more than one input. This is not supported.'
+    k, i, f = kifs[0]
+
+    # If the quantizer bit width is unnecessarily large, reduce it.
+    ok, oi, of = layer.result_t_kif
+    k, i, f = min(k, ok), min(i, oi), min(f, of)
+    if k != ok or i != oi or f != of:
+        layer.keep_negative.assign(tf.minimum(layer.keep_negative, k))
+        layer.integers.assign(tf.minimum(layer.integers, k + i))
+        layer.bits.assign(tf.minimum(layer.bits, k + i + f))
+
+    return k, i, f
 
 
 @get_produced_kif.register
