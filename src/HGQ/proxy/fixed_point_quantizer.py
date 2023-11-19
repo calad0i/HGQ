@@ -145,7 +145,7 @@ def fixed(bits, integer_bits, RND='TRN', SAT='WRAP') -> Callable:
 
 class FixedPointQuantizer(keras.layers.Layer, metaclass=abc.ABCMeta):
 
-    def __init__(self, keep_negative, bits, integers, RND: str = 'TRN', SAT: str = 'WRAP', overrides: dict | None = None, accum_bits_bias=None, **kwargs):
+    def __init__(self, keep_negative, bits, integers, RND: str = 'TRN', SAT: str = 'WRAP', overrides: dict | None = None, **kwargs):
 
         zeros = bits == 0
 
@@ -163,7 +163,6 @@ class FixedPointQuantizer(keras.layers.Layer, metaclass=abc.ABCMeta):
         self.integers = tf.Variable(integers, dtype='int8', name='integers', trainable=False)
         assert self.keep_negative.shape == self.bits.shape == self.integers.shape, f'Shapes mismatch: keep_negative, bits, and integers must have the same shape. Got {self.keep_negative.shape}, {self.bits.shape}, {self.integers.shape}.'
 
-        self.accum_bits_bias = accum_bits_bias
         self.RND = RND
         self.SAT = SAT
         self.overrides = overrides or {'layers': {}}

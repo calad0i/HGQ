@@ -144,7 +144,7 @@ def extract_keras_layers(layer: HLayerBase | PLayerBase, name: str) -> tuple[ker
         return klayer,
 
 
-def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', accum_bits_bias=None) -> tuple[FixedPointQuantizer, ...]:
+def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP') -> tuple[FixedPointQuantizer, ...]:
     """Given a HGQ layer, return a tuple of quantizers that are used in the layer."""
     if isinstance(layer, Signature):
         return FixedPointQuantizer(layer.keep_negative, layer.bits, layer.int_bits, 'TRN', SAT),
@@ -166,7 +166,7 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', acc
 
     if not relu_act:
         k, b, i = kn, kn + int_bits + fp_bits, kn + int_bits
-        return FixedPointQuantizer(k, b, i, RND, SAT, name=f'{name}_quantizer', overrides=overriddes, accum_bits_bias=accum_bits_bias),
+        return FixedPointQuantizer(k, b, i, RND, SAT, name=f'{name}_quantizer', overrides=overriddes),
 
     mask = int_bits + fp_bits + kn > 0
 
@@ -188,25 +188,25 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', acc
     elif RND != 'TRN':
         b += 2
 
-    layer_quantizer = FixedPointQuantizer(k, b, i, 'TRN', SAT, name=f'{name}_quantizer', overrides=overriddes, accum_bits_bias=accum_bits_bias)
+    layer_quantizer = FixedPointQuantizer(k, b, i, 'TRN', SAT, name=f'{name}_quantizer', overrides=overriddes)
 
     return layer_quantizer, relu_quantizer
 
 
 @singledispatch
-def to_proxy_layers(layer, name, SAT: str, accum_bits_bias: int | None):
+def to_proxy_layers(layer, name, SAT: str):
     """Given a layer, return a tuple of keras layers and quantizers that are equivalent to the layer when applied in order. (When it doesn't overflow, and up to fp precision)"""
     raise TypeError(f'No matching overload for layer type {type(layer)}. Signatures available: {to_proxy_layers.registry.keys()}')
 
 
 @to_proxy_layers.register
-def _(layer: ABSBaseLayer, name, SAT: str, accum_bits_bias: int | None):
+def _(layer: ABSBaseLayer, name, SAT: str):
     proxy_quantizer_layers = ()
     layers = []
     proxy_layers = list(extract_keras_layers(layer, name))
 
     if hasattr(layer, 'pre_activation_quantizer'):
-        proxy_quantizer_layers = list(extract_quantizers(layer, name, SAT, accum_bits_bias))
+        proxy_quantizer_layers = list(extract_quantizers(layer, name, SAT))
     if len(proxy_layers) > len(proxy_quantizer_layers) and isinstance(layer, HLayerBase):
         warn(f'Layer {layer.name} does not have a quantizer attached!')
 
@@ -223,7 +223,7 @@ def _(layer: ABSBaseLayer, name, SAT: str, accum_bits_bias: int | None):
 SKIP_LAYERS = (PDropout,)
 
 
-def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = None, SAT='WRAP', accum_bits_bias=None):
+def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = None, SAT='WRAP'):
     """Given a HGQ-competible layer and a tensor, return the output of the layer when applied to the tensor. Used in builing the proxy model."""
     if isinstance(layer, SKIP_LAYERS):
         return tensor
@@ -231,12 +231,12 @@ def apply_proxy_layers(layer: keras.layers.Layer, tensor, namer: Namer | None = 
         name = namer.next_name(layer.name)
     else:
         name = layer.name
-    for l in to_proxy_layers(layer, name, SAT, accum_bits_bias):
+    for l in to_proxy_layers(layer, name, SAT):
         tensor = l(tensor)
     return tensor
 
 
-def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits_bias: int | None = None):
+def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_offset: int | None = None):
     """Given a HGQ model, return a hls4ml-ready keras model.
 
     Args:
@@ -244,14 +244,14 @@ def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits_bias:
 
         aggressive (default: True): If True, use WRAP overflow mode. Sigificant performance degradation may occur if overflow occurs, but latency may be reduced. If False, use SAT overflow mode. Performance is more stable when it overflows, but latency may be increased.
 
-        accum_bits_bias (default: None): If not None, autoset accumlator such that the model is bit accurate (when no overflow occurs and up to fp precision). If set, use the specified number of floating bits plus result float bits as accumlator float bits. May improve latency in some rare cases, not recommended in general.
+        accum_fp_max_offset (default: None): If not None, autoset accumlator such that the model is bit accurate (when no overflow occurs and up to fp precision). If set, use the specified number of floating bits plus result float bits as accumlator float bits. May improve latency in some rare cases, not recommended in general.
 
     """
     input_nodes, output_nodes, dependencies_list = solve_dependencies(model)
 
-    if accum_bits_bias is not None and not aggressive:
+    if accum_fp_max_offset is not None and not aggressive:
         warn('You are using bitgrowth (aggressive=False) together with bias_accum_bits set. This is not recommended. If you are sure what you are doing, ignore this warning.')
-    if accum_bits_bias is not None and accum_bits_bias < 0:
+    if accum_fp_max_offset is not None and accum_fp_max_offset < 0:
         warn('You are using a negative value for bias_accum_bits. Please make sure you know what you are doing.')
 
     nof_output = len(output_nodes)
@@ -270,7 +270,7 @@ def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits_bias:
             inps = [satisfied[node] for node in requires]
             if len(inps) == 1:
                 inps = inps[0]
-            out = apply_proxy_layers(layer, inps, namer=namer, SAT=SAT, accum_bits_bias=accum_bits_bias)
+            out = apply_proxy_layers(layer, inps, namer=namer, SAT=SAT)
             satisfied[provides] = out
             if provides in output_nodes:
                 outputs.append(out)
@@ -286,5 +286,5 @@ def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_bits_bias:
         inputs = inputs[0]
     model = keras.Model(inputs=inputs, outputs=outputs)
     for layer in model.layers:
-        register_qconf(layer)
+        register_qconf(layer, accum_fp_max_offset=accum_fp_max_offset)
     return model

@@ -276,7 +276,7 @@ def get_result_kifRS(layer: keras.layers.Layer) -> tuple[int, int, int, str, str
     return k, i, f, 'TRN', 'WRAP'
 
 
-def get_config_wight_accum_result_bias(layer: keras.layers.Layer, bias_accum_fp: None | int = None):
+def get_config_wight_accum_result_bias(layer: keras.layers.Layer, accum_fp_max_offset: None | int = None):
     """Get the quantization configuration for a layer with kernel in the proxy model."""
     assert hasattr(layer, 'kernel'), f'Layer {layer.name} does not have kernel.'
     r_k, r_i, r_f, RND, SAT = get_result_kifRS(layer)
@@ -284,19 +284,18 @@ def get_config_wight_accum_result_bias(layer: keras.layers.Layer, bias_accum_fp:
     k_k, k_i, k_f = get_arr_container(layer.kernel.numpy())
     weight_t = tuple_to_apf((k_k, k_i, k_f))
     result_t = tuple_to_apf((r_k, r_i, r_f), RND, SAT)
-    if bias_accum_fp is None:
-        _, _, f = get_produced_kif(layer)
+    if accum_fp_max_offset is None:
         a_f = p_f
     else:
-        a_f = r_f + bias_accum_fp
+        a_f = min(r_f + accum_fp_max_offset, p_f)
 
     if SAT.upper() == 'WRAP':
         accum_t = tuple_to_apf((r_k, r_i, a_f))
     else:
         k, i, f = p_k, p_i, a_f
-        if bias_accum_fp is not None:
-            warn(f'Layer {layer.name} has SAT={SAT}, and has bias_accum_fp set. Proceed only if you know what you are doing.')
-            f = bias_accum_fp + r_f
+        if accum_fp_max_offset is not None:
+            warn(f'Layer {layer.name} has SAT={SAT}, and has accum_fp_max_offset set. Proceed only if you know what you are doing.')
+            f = min(accum_fp_max_offset + r_f, f)
         accum_t = tuple_to_apf((k, i, f))
     bias_t = accum_t
     return weight_t, accum_t, result_t, bias_t
@@ -322,10 +321,10 @@ def get_config_table_tablesize_result(layer: keras.layers.Activation):
     return table_t, table_size, result_t
 
 
-def get_config(layer: keras.layers.Layer, bias_accum_fp: None | int = None):
+def get_config(layer: keras.layers.Layer, accum_fp_max_offset: None | int = None):
     """Get the quantization configuration for a layer in the proxy model."""
     if hasattr(layer, 'kernel'):
-        weight_t, accum_t, result_t, bias_t = get_config_wight_accum_result_bias(layer, bias_accum_fp)
+        weight_t, accum_t, result_t, bias_t = get_config_wight_accum_result_bias(layer, accum_fp_max_offset)
         conf = {'weight_t': weight_t, 'accum_t': accum_t, 'result_t': result_t, 'bias_t': bias_t}
     elif isinstance(layer, keras.layers.Activation):
         table_t, table_size, result_t = get_config_table_tablesize_result(layer)
@@ -375,9 +374,9 @@ def get_whatever_quantizer(layer: keras.layers.Layer):
     return q
 
 
-def register_qconf(layer: keras.layers.Layer):
+def register_qconf(layer: keras.layers.Layer, accum_fp_max_offset: None | int = None):
     """Get and register quantization configuration for a layer in the proxy model."""
     q = get_whatever_quantizer(layer)
-    conf = get_config(layer)
+    conf = get_config(layer, accum_fp_max_offset=accum_fp_max_offset)
     overrides = q.overrides or {}
     overrides['layers'].setdefault(layer.name, {}).update(conf)
