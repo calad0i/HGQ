@@ -1,10 +1,12 @@
+from functools import singledispatch
+
 import numpy as np
 import tensorflow as tf
 from keras.src.engine.node import Node
-from keras.src.layers.convolutional.base_conv import Conv as BaseConv
 from tensorflow import keras
 
 from ..layers import HLayerBase, HQuantize, PDropout, PLayerBase, Signature
+from ..layers.base import ABSBaseLayer
 from ..utils import warn
 from .fixed_point_quantizer import FixedPointQuantizer
 from .precision_derivation import register_qconf
@@ -191,8 +193,14 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP', acc
     return layer_quantizer, relu_quantizer
 
 
-def to_proxy_layers(layer: keras.layers.Layer, name, SAT: str, accum_bits_bias: int | None):
-    """Given a HGQ-competible layer, return a tuple of keras layers and quantizers that are equivalent to the layer when applied in order. (When it doesn't overflow, and up to fp precision)"""
+@singledispatch
+def to_proxy_layers(layer, name, SAT: str, accum_bits_bias: int | None):
+    """Given a layer, return a tuple of keras layers and quantizers that are equivalent to the layer when applied in order. (When it doesn't overflow, and up to fp precision)"""
+    raise RuntimeError(f'No matching overload for layer type {type(layer)}. Signatures available: {to_proxy_layers.registry.keys()}')
+
+
+@to_proxy_layers.register
+def _(layer: ABSBaseLayer, name, SAT: str, accum_bits_bias: int | None):
     proxy_quantizer_layers = ()
     layers = []
     proxy_layers = list(extract_keras_layers(layer, name))

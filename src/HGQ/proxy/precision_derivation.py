@@ -1,15 +1,15 @@
 from collections.abc import Callable
+from functools import singledispatch
 
 import numpy as np
 import tensorflow as tf
-from keras.layers import AveragePooling1D, AveragePooling2D, AveragePooling3D, Concatenate, Flatten, Reshape
+from keras.layers import AvgPool1D, AvgPool2D, AvgPool3D, Concatenate, Flatten, MaxPool1D, MaxPool2D, MaxPool3D, Reshape
 from keras.src.layers.convolutional.base_conv import Conv
 from keras.src.layers.pooling.base_pooling1d import Pooling1D
 from keras.src.layers.pooling.base_pooling2d import Pooling2D
 from keras.src.layers.pooling.base_pooling3d import Pooling3D
 from tensorflow import keras
 
-from ..quantizer import get_arr_bits
 from ..utils import apf_to_tuple, tuple_to_apf, warn
 from .fixed_point_quantizer import FixedPointQuantizer
 
@@ -70,45 +70,88 @@ def get_input_kifs(layer: keras.layers.Layer) -> tuple[tuple[int, int, int] | np
         return tuple(get_produced_kif(parent) for parent in parents)
 
 
-def get_produced_kif(layer: keras.layers.Layer | FixedPointQuantizer) -> tuple[int, int, int]:
+# ===================================================================================================
+# Given a layer, get the produced bitwidth of the layer, as a tuple of (k, i, f).
+# ===================================================================================================
+
+@singledispatch
+def get_produced_kif(layer) -> tuple[int, int, int]:
     """Get the produced bitwidth of a layer, as a tuple of (k, i, f)."""
-    if isinstance(layer, FixedPointQuantizer):
-        k, i, f = layer.result_t_kif
-        return k, i, f
+    warn(f'Layer {layer.name} is unknown. Assuming infinite produced bitwidth.')
+    return 1, 65535, 65535
 
+
+@get_produced_kif.register
+def _(layer: FixedPointQuantizer):
+    return layer.result_t_kif
+
+
+@get_produced_kif.register
+def _(layer: keras.layers.Activation):
     kifs = get_input_kifs(layer)
-
-    if len(kifs) == 1:  # one output layer
-        k, i, f = kifs[0]
-        if hasattr(layer, 'kernel'):
-            w_k, w_i, w_f = get_arr_container(layer.kernel.numpy())
-            k, i, f = int(k or w_k), i + w_i, f + w_f
-            if isinstance(layer, keras.layers.Dense):
-                multiplicity = np.prod(layer.kernel.shape) / layer.units
-            elif isinstance(layer, Conv):
-                multiplicity = np.prod(layer.kernel.shape) / layer.filters
-            else:
-                multiplicity = np.prod(layer.kernel.shape)
-                warn(f'Layer {layer.name} is not Dense or Conv. Multiplicity for accum size estimation is assumed to be maximum whole size of {multiplicity}.')
-            i += int(np.ceil(np.log2(multiplicity)))
-        elif isinstance(layer, keras.layers.Activation):
-            # k,i,f, R, S = derive_result_kifRS_from_next_quantizers(layer)
-            k, i, f = activation_kif_forward(layer.activation, k, i, f)
-        elif isinstance(layer, (AveragePooling3D, AveragePooling2D, AveragePooling1D)):
-            pool_size = np.prod(layer.pool_size)
-            f += int(np.ceil(np.log2(pool_size)))
-    else:
-        if isinstance(layer, keras.layers.Add):
-            k, i, f = np.max(kifs, axis=0)
-            # being lazy here. But this will never overflow.
-            i += int(np.ceil(np.log2(len(kifs))))
-        elif isinstance(layer, keras.layers.Concatenate):
-            k, i, f = np.max(kifs, axis=0)
-        else:
-            # isinstance(layer, keras.layers.Multiply). Or, this should the most conservative assumption anyway.
-            k, i, f = np.sum(kifs, axis=0)
-            k = int(k != 0)
+    assert len(kifs) == 1, f'Activation layer {layer.name} has more than one input. This is not supported.'
+    assert isinstance(layer.activation, Callable), f'Activation layer {layer.name} has non-callable activation. Did you build the model?'
+    k, i, f = activation_kif_forward(layer.activation, *np.max(kifs, axis=0))
     return k, i, f
+
+
+@get_produced_kif.register
+def _(layer: AvgPool1D | AvgPool2D | AvgPool3D):
+    kifs = get_input_kifs(layer)
+    assert len(kifs) == 1, f'Pooling layer {layer.name} has more than one input. This is not supported.'
+    k, i, f = kifs[0]
+    pool_size = np.prod(layer.pool_size)
+    f += int(np.ceil(np.log2(pool_size)))
+    return k, i, f
+
+
+@get_produced_kif.register
+def _(layer: keras.layers.Add):
+    kifs = get_input_kifs(layer)
+    k, i, f = np.max(kifs, axis=0)
+    # being lazy here. But this will never overflow.
+    i += int(np.ceil(np.log2(len(kifs))))
+    return k, i, f
+
+
+@get_produced_kif.register
+def _(layer: keras.layers.Concatenate):
+    kifs = get_input_kifs(layer)
+    k, i, f = np.max(kifs, axis=0)
+    return k, i, f
+
+
+@get_produced_kif.register
+def _(layer: keras.layers.Dense | Conv):
+    kifs = get_input_kifs(layer)
+    assert len(kifs) == 1, f'Dense layer {layer.name} has more than one input. This is not supported.'
+    k, i, f = kifs[0]
+    w_k, w_i, w_f = get_arr_container(layer.kernel.numpy())
+    k, i, f = int(k or w_k), i + w_i, f + w_f
+    if isinstance(layer, Conv):
+        div = layer.filters
+    else:
+        div = layer.units
+
+    multiplicity = np.prod(layer.kernel.shape) / div
+    i += int(np.ceil(np.log2(multiplicity)))
+    return k, i, f
+
+
+@get_produced_kif.register
+def _(layer: Reshape | Flatten | MaxPool3D | MaxPool2D | MaxPool1D):
+    kifs = get_input_kifs(layer)
+    assert len(kifs) == 1, f'Flatten/Reshape layer {layer.name} has more than one input. This is not supported.'
+    k, i, f = kifs[0]
+    return k, i, f
+
+
+@get_produced_kif.register
+def _(layer: keras.layers.InputLayer):
+    return 1, 65535, 65535
+
+
+# ===================================================================================================
 
 
 def get_requested_kif(layer: keras.layers.Layer | FixedPointQuantizer) -> tuple[int, int, int]:
@@ -123,32 +166,41 @@ def get_requested_kif(layer: keras.layers.Layer | FixedPointQuantizer) -> tuple[
         k, i, f = np.max(requested_kifs, axis=0)
         return k, i, f
 
+# ===================================================================================================
+# Given a layer, get the bitwidth it requests (maximum bitwidth it can make use of), as a tuple of (k, i, f).
+# ===================================================================================================
 
-def get_request_kif(layer: keras.layers.Layer | FixedPointQuantizer) -> tuple[int, int, int]:
+
+@singledispatch
+def get_request_kif(layer: keras.layers.Layer) -> tuple[int, int, int]:
     """Get the requested bitwidth of a layer, as a tuple of (k, i, f)"""
-    if isinstance(layer, FixedPointQuantizer):
-        k, i, f = layer.result_t_kif
-        rnd = layer.RND
-        sat = layer.SAT
-        if rnd.upper() == 'TRN':
-            f += 0
-        elif rnd.upper() == 'RND':
-            f += 1
-        else:
-            f += 2
-        if sat.upper() != 'WRAP':
-            i = 65535
-        return k, i, f
-
-    else:
-        if isinstance(layer, (Pooling1D, Pooling2D, Pooling3D, Concatenate, Reshape, Flatten)):
-            out_layers: list[keras.layers.Layer] = [node.outbound_layer for node in layer._outbound_nodes]
-            if out_layers:
-                # Layers that does nothing. Pass through.
-                requested_kifs = [get_request_kif(out_layer) for out_layer in out_layers]
-                k, i, f = np.max(requested_kifs, axis=0)
-                return k, i, f
+    if isinstance(layer, (Pooling1D, Pooling2D, Pooling3D, Concatenate, Reshape, Flatten)):
+        out_layers: list[keras.layers.Layer] = [node.outbound_layer for node in layer._outbound_nodes]
+        if out_layers:
+            # Layers that does nothing. Pass through.
+            requested_kifs = [get_request_kif(out_layer) for out_layer in out_layers]
+            k, i, f = np.max(requested_kifs, axis=0)
+            return k, i, f
     return 1, 65535, 65535
+
+
+@get_request_kif.register
+def _(layer: FixedPointQuantizer):
+    k, i, f = layer.result_t_kif
+    rnd = layer.RND
+    sat = layer.SAT
+    if rnd.upper() == 'TRN':
+        f += 0
+    elif rnd.upper() == 'RND':
+        f += 1
+    else:
+        f += 2
+    if 'WRAP' not in sat.upper():
+        i = 65535
+    return k, i, f
+
+
+# ===================================================================================================
 
 
 def merge_precision(available: tuple[int, int, int], request: tuple[int, int, int]):

@@ -142,7 +142,11 @@ def fixed(bits, integer_bits, RND='TRN', SAT='WRAP') -> Callable:
     return gfixed(1, bits, integer_bits, RND, SAT)
 
 
-class FixedPointQuantizer(keras.layers.Layer):
+class QuantizerBase(keras.layers.Layer):
+    pass
+
+
+class FixedPointQuantizer(QuantizerBase):
 
     def __init__(self, keep_negative, bits, integers, RND: str = 'TRN', SAT: str = 'WRAP', overrides: dict | None = None, accum_bits_bias=None, **kwargs):
 
