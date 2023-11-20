@@ -284,7 +284,7 @@ def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_off
         outputs = outputs[0]
     if len(inputs) == 1:
         inputs = inputs[0]
-    model = keras.Model(inputs=inputs, outputs=outputs)
-    for layer in model.layers:
+    proxy = keras.Model(inputs=inputs, outputs=outputs)
+    for layer in proxy.layers:
         register_qconf(layer, accum_fp_max_offset=accum_fp_max_offset)
-    return model
+    return proxy

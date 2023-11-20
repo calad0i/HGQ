@@ -137,6 +137,6 @@ def tuple_to_apf(t: tuple, rnd='TRN', warp='WARP', keep_zeros=True):
     return f'{"u" if kn==0 else ""}fixed<{max(i+f+kn,1)},{i+kn}>'
 
 
-def warn(msg: str, stacklevel=1):
+def warn(msg: str, stacklevel=2):
     # print in yellow
     _warn(f'\033[93m{msg}\033[0m', stacklevel=stacklevel)

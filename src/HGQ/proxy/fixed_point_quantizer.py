@@ -150,10 +150,13 @@ class FixedPointQuantizer(keras.layers.Layer, metaclass=abc.ABCMeta):
         zeros = bits == 0
 
         if not hasattr(keep_negative, 'shape'):
+            keep_negative = np.int8(keep_negative)
             keep_negative = tf.constant([keep_negative], dtype='int8')
         if not hasattr(bits, 'shape'):
+            bits = np.int8(bits)
             bits = tf.constant([bits], dtype='int8')
         if not hasattr(integers, 'shape'):
+            integers = np.int8(integers)
             integers = tf.constant([integers], dtype='int8')
 
         keep_negative = tf.where(zeros, tf.zeros_like(keep_negative), keep_negative)

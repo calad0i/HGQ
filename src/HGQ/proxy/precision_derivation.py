@@ -102,8 +102,7 @@ def _(layer: FixedPointQuantizer):
 def _(layer: keras.layers.Activation):
     kifs = get_input_kifs(layer)
     assert len(kifs) == 1, f'Activation layer {layer.name} has more than one input. This is not supported.'
-    assert isinstance(layer.activation, Callable), f'Activation layer {layer.name} has non-callable activation. Did you build the model?'
-    k, i, f = activation_kif_forward(layer.activation, *np.max(kifs, axis=0))
+    k, i, f = activation_kif_forward(layer, *np.max(kifs, axis=0))
     return k, i, f
 
 
@@ -248,6 +247,8 @@ def derive_result_kifRS_from_next_quantizers(layer: keras.layers.Layer) -> tuple
     """Get the result bitwidth of a layer that has a quantizer following immediately, as a tuple of (k, i, f, RND, SAT). In general, any InputLayer or layers with kernels will have a quantizer following immediately."""
     Ks, Is, Fs, RNDs, SATs = [], [], [], [], []
     out_layers: list[FixedPointQuantizer] = [node.outbound_layer for node in layer._outbound_nodes]
+    for out_layer in out_layers:
+        assert isinstance(out_layer, FixedPointQuantizer), f'Layer {layer.name} has a non-quantizer layer {out_layer.name} following it. This is not supported.'
     kifRSs = np.array(list(map(lambda x: (*x.result_t_kif, x.RND, x.SAT), out_layers)), dtype=object)
     Ks, Is, Fs, RNDs, SATs = kifRSs.T
     assert np.all(SATs == SATs[0]), f'Input layer {layer.name} has different SATs. This is not supported.'
