@@ -200,7 +200,7 @@ def to_proxy_layers(layer, name, SAT: str):
 
 
 @to_proxy_layers.register
-def _(layer: ABSBaseLayer, name, SAT: str):
+def _(layer: ABSBaseLayer, name: str, SAT: str):
     proxy_quantizer_layers = ()
     layers = []
     proxy_layers = list(extract_keras_layers(layer, name))

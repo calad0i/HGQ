@@ -82,7 +82,7 @@ def WRAP(x, k, b):
     return tf.math.floormod(x - low, high - low + 1) + low
 
 
-def WRAP_SYM(x, k, b):
+def WRAP_SM(x, k, b):
     # High and low bounds are reflective. When overflows, can be less trash than WARP but still more trash than SAT.
     dtype = x.dtype
     high = 2**(b - k) - 1
@@ -107,7 +107,7 @@ SAT_MAP = {
     'SAT_ZERO': SAT_ZERO,
     'SAT_SYM': SAT_SYM,
     'WRAP': WRAP,
-    'WRAP_SYM': WRAP_SYM,
+    'WRAP_SM': WRAP_SM,
 }
 
 
