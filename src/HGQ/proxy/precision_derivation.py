@@ -17,7 +17,7 @@ STREAM = False
 "This variable is not used for now."
 
 
-def get_arr_container(arr: np.ndarray):
+def get_arr_container(arr: np.ndarray, silent=False):
     """ Get the minimal fixed integer that can represent the array (kif format). If the result is greater than ~30, consider that as inf. (Not representable by fixed point with reasonable bitwidth.)"""
     k = arr < 0
     lf, hf = -32, 32
@@ -34,7 +34,7 @@ def get_arr_container(arr: np.ndarray):
         else:
             lf = f
     f = int(hf)
-    if hf == 32:
+    if hf == 32 and not silent:
         warn('Failed to derive fractional bits. Is the array really quantized with less than 32 fp bits?')
     with np.errstate(divide='ignore'):
         i1, i2 = -np.inf, -np.inf
@@ -54,7 +54,7 @@ def activation_kif_forward(func: Callable, k: int, i: int, f: int):
     N = min(2**(k + i + f), 2**20)
     arr = np.array(np.linspace(-2.**i * k, 2.**i - 2.**-f, N), dtype=np.float64)
     arr: np.ndarray = np.array(func(arr), dtype=np.float32)
-    K, I, F = get_arr_container(arr)
+    K, I, F = get_arr_container(arr, silent=True)
     return K, I, F
 
 
