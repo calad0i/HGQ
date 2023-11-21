@@ -1,5 +1,6 @@
-from .qkeras import init
-
-
 def init_all():
-    init()
+    try:
+        from .qkeras import init
+        init()
+    except ImportError:
+        pass
