@@ -47,7 +47,7 @@ def get_data(N: int, sigma: float, max_scale: float, seed):
 @pytest.mark.parametrize("io_type", ['io_parallel', 'io_stream'])
 @pytest.mark.parametrize("aggressive", [False])
 @pytest.mark.parametrize("backend", ['vivado', 'vitis', 'Quartus'])
-@pytest.mark.parametrize("seed", [1919810])
+@pytest.mark.parametrize("seed", [42, 114514, 1919810])
 def test_syn_qkeras(N: int, io_type: str, aggressive: bool, backend: str, seed: int):
     dir = get_test_dir()
     set_seed(seed)
