@@ -83,7 +83,7 @@ def _run_model_sl_test(model: keras.Model, proxy: keras.Model, data, output_dir:
     assert tf.reduce_all(proxy(data) == proxy_loaded(data)), f"Proxy prediction mismatch"
 
 
-def _run_model_proxy_match_test(model: keras.Model, proxy: keras.Model, data, cover_factor: float):
+def _run_model_proxy_match_test(model: keras.Model, proxy: keras.Model, data, cover_factor: float | None):
     nof_outputs = len(model.outputs)  # type: ignore
     if nof_outputs > 1:
         r_keras: list[np.ndarray] = [x.numpy() for x in model(data)]  # type: ignore
@@ -100,7 +100,7 @@ def _run_model_proxy_match_test(model: keras.Model, proxy: keras.Model, data, co
         except AssertionError as e:
             errors.append(e)
 
-    if cover_factor >= 1.0:
+    if cover_factor is None or cover_factor >= 1.0:
         if not len(errors) == 0:
             raise AssertionError('\n'.join([str(e) for e in errors]))
     else:
@@ -108,12 +108,14 @@ def _run_model_proxy_match_test(model: keras.Model, proxy: keras.Model, data, co
             warn(f"Keras-Proxy perfect match when overflow should happen: cover_factor={cover_factor}.")
 
 
-def run_model_test(model: keras.Model, cover_factor: float, data, io_type: str, backend: str, dir: str, aggressive: bool, no_exact_match: bool = False):
+def run_model_test(model: keras.Model, cover_factor: float | None, data, io_type: str, backend: str, dir: str, aggressive: bool, no_exact_match: bool = False, skip_sl_test=False):
     data_len = data.shape[0] if isinstance(data, np.ndarray) else data[0].shape[0]
-    trace_minmax(model, data, cover_factor=cover_factor, bsz=data_len)
+    if cover_factor is not None:
+        trace_minmax(model, data, cover_factor=cover_factor, bsz=data_len)
     proxy = to_proxy_model(model, aggressive=aggressive)
     try:
-        _run_model_sl_test(model, proxy, data, dir)
+        if not skip_sl_test:
+            _run_model_sl_test(model, proxy, data, dir)
         _run_model_proxy_match_test(model, proxy, data, cover_factor)
         _run_synth_match_test(proxy, data, io_type, backend, dir)
     except AssertionError as e:
