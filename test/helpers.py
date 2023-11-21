@@ -41,7 +41,7 @@ def _run_synth_match_test(proxy: keras.Model, data, io_type: str, backend: str, 
         io_type=io_type,
         output_dir=output_dir,
         backend=backend,
-        hls_config={'Model': {'Precision': 'ap_fixed<32,16>', 'ReuseFactor': 1}}
+        hls_config={'Model': {'Precision': 'fixed<1,0>', 'ReuseFactor': 1}}
     )
     hls_model.compile()
 
