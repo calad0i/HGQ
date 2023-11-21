@@ -1,18 +1,22 @@
+import abc
+
 import keras
 import numpy as np
 import qkeras
+from keras import backend as K
 from qkeras import quantizers
 from qkeras.quantizers import BaseQuantizer
 from qkeras.utils import _add_supported_quantized_objects
 from tensorflow import keras
 
-qkeras_objects = {}
-_add_supported_quantized_objects(qkeras_objects)
-from keras import backend as K
-from qkeras.quantizers import BaseQuantizer
-
 from HGQ.proxy.fixed_point_quantizer import FixedPointQuantizer
 from HGQ.utils import warn
+
+from ..convert import to_proxy_layers
+from ..precision_derivation import get_produced_kif
+
+qkeras_objects = {}
+_add_supported_quantized_objects(qkeras_objects)
 
 qkeras_layers = {v for v in qkeras_objects.values() if issubclass(v, keras.layers.Layer)}
 qkeras_quantizers = {v for v in qkeras_objects.values() if issubclass(v, BaseQuantizer)}
@@ -126,12 +130,6 @@ def qkeras_to_proxy_layers(layer: keras.layers.Layer, name: str, SAT: str) -> tu
         return klayer, *act_layers
     else:
         return *act_layers,
-
-
-import abc
-
-from ..convert import to_proxy_layers
-from ..precision_derivation import get_produced_kif
 
 
 class QKerasBaseLayer(metaclass=abc.ABCMeta):
