@@ -2,6 +2,7 @@ from functools import singledispatch
 
 import numpy as np
 import tensorflow as tf
+from keras.src.engine.keras_tensor import KerasTensor
 from keras.src.engine.node import Node
 from tensorflow import keras
 
@@ -25,13 +26,11 @@ def get_all_nodes(model: keras.Model) -> set[Node]:
 
 def solve_dependencies(model: keras.Model):
     """Given a keras model, return the input nodes, output nodes and a list of (layer, requires, provides) tuples. Requires is a list of nodes that are parents of the layer, provides is the node that is the output of the layer."""
-    inp_tensors = model.inputs
-    out_tensors = model.outputs
-    inp_layers = [tensor._keras_history.layer for tensor in inp_tensors]  # type:ignore
-    out_layers = [tensor._keras_history.layer for tensor in out_tensors]  # type:ignore
+    inp_tensors: list[KerasTensor] = model.inputs  # type:ignore
+    out_tensors: list[KerasTensor] = model.outputs  # type:ignore
 
-    input_nodes: list[Node] = [inp_layer._inbound_nodes[0] for inp_layer in inp_layers]
-    output_nodes: list[Node] = [out_layer._inbound_nodes[0] for out_layer in out_layers]
+    input_nodes: list[Node] = [t.node for t in inp_tensors]  # type:ignore
+    output_nodes: list[Node] = [t.node for t in out_tensors]  # type:ignore
 
     nodes = get_all_nodes(model)
 
@@ -194,8 +193,16 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP') -> 
 
 
 @singledispatch
-def to_proxy_layers(layer, name, SAT: str):
+def to_proxy_layers(layer, name, SAT: str) -> tuple[keras.layers.Layer, ...]:
     """Given a layer, return a tuple of keras layers and quantizers that are equivalent to the layer when applied in order. (When it doesn't overflow, and up to fp precision)"""
+    if hasattr(keras.layers, layer.__class__.__name__):
+        # Is already vanilla keras layer
+        new_layer = layer.__class__.from_config(layer.get_config())
+        new_layer.build(layer.input_shape)
+        for w1, w2 in zip(new_layer.weights, layer.weights):
+            w1.assign(w2)
+        return new_layer,
+
     raise TypeError(f'No matching overload for layer type {type(layer)}. Signatures available: {to_proxy_layers.registry.keys()}')
 
 
@@ -217,7 +224,7 @@ def _(layer: ABSBaseLayer, name: str, SAT: str):
             layers.append(proxy_quantizer_layers.pop(0))
 
     assert layers, f'Failed to convert layer {layer.name}: layer not mapped to anything.'
-    return layers
+    return tuple(layers)
 
 
 SKIP_LAYERS = (PDropout,)
