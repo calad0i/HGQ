@@ -7,16 +7,16 @@ import tensorflow as tf
 from helpers import get_test_dir, run_model_test, set_seed
 from tensorflow import keras
 
-from HGQ import get_default_pre_activation_quantizer_config, set_default_pre_activation_quantizer_config
+from HGQ import get_default_paq_config, set_default_paq_conf
 from HGQ.layers import HActivation, HAdd, HConv1D, HConv2D, HDense, HQuantize, PConcatenate, PDropout, PFlatten, PMaxPool1D, PMaxPool2D, PReshape
 
 
 def create_model(rnd_strategy: str, io_type: str):
 
-    pa_config = get_default_pre_activation_quantizer_config()
+    pa_config = get_default_paq_config()
     pa_config['skip_dims'] = 'all' if io_type == 'io_stream' else 'batch'
     pa_config['rnd_strategy'] = rnd_strategy
-    set_default_pre_activation_quantizer_config(pa_config)
+    set_default_paq_conf(pa_config)
 
     inp = keras.Input(shape=(10, 10))
     qinp = HQuantize()(inp)
@@ -45,12 +45,12 @@ def create_model(rnd_strategy: str, io_type: str):
 
     for layer in horrible_model.layers:
         # Randomize weight bitwidths
-        if hasattr(layer, 'kernel_quantizer'):
-            fbw: tf.Variable = layer.kernel_quantizer.fbw
+        if hasattr(layer, 'kq'):
+            fbw: tf.Variable = layer.kq.fbw
             fbw.assign(tf.constant(np.random.uniform(2, 8, fbw.shape).astype(np.float32)))
         # And activation bitwidths
-        if hasattr(layer, 'pre_activation_quantizer'):
-            fbw: tf.Variable = layer.pre_activation_quantizer.fbw
+        if hasattr(layer, 'paq'):
+            fbw: tf.Variable = layer.paq.fbw
             fbw.assign(tf.constant(np.random.uniform(2, 6, fbw.shape).astype(np.float32)))
     return horrible_model
 

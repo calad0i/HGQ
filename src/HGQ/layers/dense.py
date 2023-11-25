@@ -20,8 +20,8 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
         activity_regularizer=None,
         kernel_constraint=None,
         bias_constraint=None,
-        kernel_quantizer_config=None,
-        pre_activation_quantizer_config=None,
+        kq_conf=None,
+        paq_conf=None,
         beta=0.,
         **kwargs,
     ):
@@ -36,8 +36,8 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
             activity_regularizer=activity_regularizer,
             kernel_constraint=kernel_constraint,
             bias_constraint=bias_constraint,
-            kernel_quantizer_config=kernel_quantizer_config,
-            pre_activation_quantizer_config=pre_activation_quantizer_config,
+            kq_conf=kq_conf,
+            paq_conf=paq_conf,
             beta=beta,
             **kwargs
         )
@@ -49,21 +49,21 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
         input_bw = self.input_bw
         if input_bw is not None:
             kernel_bw = self._kernel_bw(kq)  # type: ignore
-            bops = tf.reduce_sum(tf.matmul(input_bw, kernel_bw))
-            self.bops.assign(bops)
-            bops = tf.cast(bops, tf.float32) * self.beta
-            self.add_loss(tf.convert_to_tensor(bops))
+            ebops = tf.reduce_sum(tf.matmul(input_bw, kernel_bw))
+            self.ebops.assign(ebops)
+            ebops = tf.cast(ebops, tf.float32) * self.beta
+            self.add_loss(tf.convert_to_tensor(ebops))
         return a
 
     @tf.function(jit_compile=True)
     def jit_forward(self, x, training=None, record_minmax=None):
 
-        kq = self.kernel_quantizer(self.fused_kernel, training, False)  # type: ignore
+        kq = self.kq(self.fused_kernel, training, False)  # type: ignore
         z = tf.matmul(x, kq)
         if self.use_bias:
-            b = self.pre_activation_quantizer.bias_forward(self.fused_bias, training, self.channel_loc)  # type: ignore
+            b = self.paq.bias_forward(self.fused_bias, training, self.channel_loc)  # type: ignore
             z = tf.nn.bias_add(z, b)
-        z = self.pre_activation_quantizer(z, training, record_minmax)  # type: ignore
+        z = self.paq(z, training, record_minmax)  # type: ignore
         a = self.activation(z)  # type: ignore
 
         return a, kq
@@ -72,11 +72,12 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
     def compute_exact_bops(self):
         kernel_bw = self.kernel_bw_exact
         input_bw = self.input_bw.numpy()  # type: ignore
-        bops = np.sum(np.matmul(input_bw, kernel_bw))
-        self.bops.assign(tf.constant(bops, dtype=tf.float32))
-        return bops
+        ebops = np.sum(np.matmul(input_bw, kernel_bw))
+        self.ebops.assign(tf.constant(ebops, dtype=tf.float32))
+        return ebops
 
 
+@register_keras_serializable(package="HGQ")
 class HDenseBatchNorm(HDense, HBatchNormBase):
 
     def __init__(
@@ -91,8 +92,8 @@ class HDenseBatchNorm(HDense, HBatchNormBase):
         activity_regularizer=None,
         kernel_constraint=None,
         bias_constraint=None,
-        kernel_quantizer_config=None,
-        pre_activation_quantizer_config=None,
+        kq_conf=None,
+        paq_conf=None,
         beta=0.,
         momentum=0.99,
         epsilon=1e-3,
@@ -119,8 +120,8 @@ class HDenseBatchNorm(HDense, HBatchNormBase):
             activity_regularizer=activity_regularizer,
             kernel_constraint=kernel_constraint,
             bias_constraint=bias_constraint,
-            kernel_quantizer_config=kernel_quantizer_config,
-            pre_activation_quantizer_config=pre_activation_quantizer_config,
+            kq_conf=kq_conf,
+            paq_conf=paq_conf,
             beta=beta,
             axis=-1,
             momentum=momentum,
@@ -153,10 +154,10 @@ class HDenseBatchNorm(HDense, HBatchNormBase):
         input_bw = self.input_bw
         if input_bw is not None:
             kernel_bw = self._kernel_bw(kq)  # type: ignore
-            bops = tf.reduce_sum(tf.matmul(input_bw, kernel_bw))
-            self.bops.assign(bops)
-            bops = tf.cast(bops, tf.float32) * self.beta
-            self.add_loss(tf.convert_to_tensor(bops))
+            ebops = tf.reduce_sum(tf.matmul(input_bw, kernel_bw))
+            self.ebops.assign(ebops)
+            ebops = tf.cast(ebops, tf.float32) * self.beta
+            self.add_loss(tf.convert_to_tensor(ebops))
         return a
 
     @tf.function(jit_compile=True)
@@ -165,7 +166,7 @@ class HDenseBatchNorm(HDense, HBatchNormBase):
         if self.scale:
             kq = self.kernel
         else:
-            kq = self.kernel_quantizer(self.kernel, training, False)  # type: ignore
+            kq = self.kq(self.kernel, training, False)  # type: ignore
 
         z = tf.matmul(x, kq)
 
@@ -178,17 +179,17 @@ class HDenseBatchNorm(HDense, HBatchNormBase):
             self.moving_variance.assign(self.momentum * self.moving_variance + (1 - self.momentum) * var)
             scale = self.bn_gamma * tf.math.rsqrt(var + self.epsilon)
             train_fused_kernel = self.kernel * scale
-            kq = self.kernel_quantizer(train_fused_kernel, training, False)  # type: ignore
+            kq = self.kq(train_fused_kernel, training, False)  # type: ignore
             z = tf.matmul(x, kq)
         else:
             scale = tf.constant(1.0, dtype=self.dtype)
 
         if self.center:
             train_fused_bias = self.bias - mean * scale  # type: ignore
-            bq = self.pre_activation_quantizer.bias_forward(train_fused_bias, training, self.channel_loc)  # type: ignore
+            bq = self.paq.bias_forward(train_fused_bias, training, self.channel_loc)  # type: ignore
             z = tf.nn.bias_add(z, bq)  # type: ignore
 
-        z = self.pre_activation_quantizer(z, training, record_minmax)  # type: ignore
+        z = self.paq(z, training, record_minmax)  # type: ignore
         a = self.activation(z)  # type: ignore
 
         return a, kq

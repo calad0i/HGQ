@@ -32,13 +32,13 @@ class HConv(HLayerBase, Conv):
         trainable=True,
         name=None,
         conv_op=None,
-        kernel_quantizer_config=None,
-        pre_activation_quantizer_config=None,
+        kq_conf=None,
+        paq_conf=None,
         beta=0.,
         parallel_factor: int = 1,
         **kwargs,
     ):
-        """parallel_factor: number of parallel kernel operation to be used. Only used in bops estimation."""
+        """parallel_factor: number of parallel kernel operation to be used. Only used in ebops estimation."""
         super().__init__(
             rank=rank,
             filters=filters,
@@ -60,8 +60,8 @@ class HConv(HLayerBase, Conv):
             trainable=trainable,
             name=name,
             conv_op=conv_op,
-            kernel_quantizer_config=kernel_quantizer_config,
-            pre_activation_quantizer_config=pre_activation_quantizer_config,
+            kq_conf=kq_conf,
+            paq_conf=paq_conf,
             beta=beta,
             **kwargs,
         )
@@ -77,8 +77,7 @@ class HConv(HLayerBase, Conv):
         self.dilation_rate = list(self.dilation_rate)
         output_shape = self.compute_output_shape(input_shape)
         self.total_channels = tf.cast(tf.reduce_prod(output_shape[1:-1]), dtype=tf.float32)
-        # self._bops_parallel_factor_modifier = self.parallel_factor
-        self.kernel_quantizer.degeneracy *= float(self.parallel_factor)
+        self.kq.degeneracy *= float(self.parallel_factor)
         return r
 
     @tf.function(jit_compile=True)
@@ -107,22 +106,22 @@ class HConv(HLayerBase, Conv):
         input_bw = self.input_bw
         if input_bw is not None:
             kernel_bw = self._kernel_bw(kq)  # type: ignore
-            bops = tf.reduce_sum(self.convolution_op(self.input_bw, kernel_bw))  # type: ignore
-            bops = bops * self.parallel_factor / self.total_channels
-            self.bops.assign(bops)
-            bops = tf.cast(bops, tf.float32) * self.beta
-            self.add_loss(tf.convert_to_tensor(bops))
+            ebops = tf.reduce_sum(self.convolution_op(self.input_bw, kernel_bw))  # type: ignore
+            ebops = ebops * self.parallel_factor / self.total_channels
+            self.ebops.assign(ebops)
+            ebops = tf.cast(ebops, tf.float32) * self.beta
+            self.add_loss(tf.convert_to_tensor(ebops))
         return a
 
     @tf.function(jit_compile=True)
     def jit_forward(self, x, training=None, record_minmax=None):
 
-        kq = self.kernel_quantizer(self.fused_kernel, training, False)  # type: ignore
+        kq = self.kq(self.fused_kernel, training, False)  # type: ignore
         z = self.convolution_op(x, kq)  # type: ignore
         if self.use_bias:
-            b = self.pre_activation_quantizer.bias_forward(self.fused_bias, training)  # type: ignore
+            b = self.paq.bias_forward(self.fused_bias, training)  # type: ignore
             z = tf.nn.bias_add(z, b, data_format=self._tf_data_format)
-        z = self.pre_activation_quantizer(z, training, record_minmax)  # type: ignore
+        z = self.paq(z, training, record_minmax)  # type: ignore
         a = self.activation(z)  # type: ignore
 
         return a, kq
@@ -131,9 +130,9 @@ class HConv(HLayerBase, Conv):
     def compute_exact_bops(self):
         kernel_bw = tf.constant(self.kernel_bw_exact, dtype=tf.float32)
         input_bw = self.input_bw  # type: ignore
-        bops = int(tf.reduce_sum(self.convolution_op(input_bw, kernel_bw)).numpy()) * int(self.parallel_factor.numpy()) / int(self.total_channels.numpy())  # type: ignore
-        self.bops.assign(tf.constant(bops, dtype=tf.float32))
-        return bops
+        ebops = int(tf.reduce_sum(self.convolution_op(input_bw, kernel_bw)).numpy()) * int(self.parallel_factor.numpy()) / int(self.total_channels.numpy())  # type: ignore
+        self.ebops.assign(tf.constant(ebops, dtype=tf.float32))
+        return ebops
 
 
 @register_keras_serializable(package="HGQ")
@@ -158,8 +157,8 @@ class HConv2D(HConv):
         bias_constraint=None,
         trainable=True,
         name=None,
-        kernel_quantizer_config=None,
-        pre_activation_quantizer_config=None,
+        kq_conf=None,
+        paq_conf=None,
         beta=0.,
         parallel_factor: int = 1,
         **kwargs,
@@ -184,8 +183,8 @@ class HConv2D(HConv):
             bias_constraint=bias_constraint,
             trainable=trainable,
             name=name,
-            kernel_quantizer_config=kernel_quantizer_config,
-            pre_activation_quantizer_config=pre_activation_quantizer_config,
+            kq_conf=kq_conf,
+            paq_conf=paq_conf,
             beta=beta,
             parallel_factor=parallel_factor,
             **kwargs,
@@ -214,8 +213,8 @@ class HConv1D(HConv):
         bias_constraint=None,
         trainable=True,
         name=None,
-        kernel_quantizer_config=None,
-        pre_activation_quantizer_config=None,
+        kq_conf=None,
+        paq_conf=None,
         beta=0.,
         parallel_factor: int = 1,
         **kwargs,
@@ -240,8 +239,8 @@ class HConv1D(HConv):
             bias_constraint=bias_constraint,
             trainable=trainable,
             name=name,
-            kernel_quantizer_config=kernel_quantizer_config,
-            pre_activation_quantizer_config=pre_activation_quantizer_config,
+            kq_conf=kq_conf,
+            paq_conf=paq_conf,
             beta=beta,
             parallel_factor=parallel_factor,
             **kwargs,
@@ -271,8 +270,8 @@ class HConvBatchNorm(HConv, HBatchNormBase):
         trainable=True,
         name=None,
         conv_op=None,
-        kernel_quantizer_config=None,
-        pre_activation_quantizer_config=None,
+        kq_conf=None,
+        paq_conf=None,
         beta=0.,
         parallel_factor: int = 1,
         momentum=0.99,
@@ -311,8 +310,8 @@ class HConvBatchNorm(HConv, HBatchNormBase):
             trainable=trainable,
             name=name,
             conv_op=conv_op,
-            kernel_quantizer_config=kernel_quantizer_config,
-            pre_activation_quantizer_config=pre_activation_quantizer_config,
+            kq_conf=kq_conf,
+            paq_conf=paq_conf,
             beta=beta,
             parallel_factor=parallel_factor,
             axis=channel_loc,
@@ -345,11 +344,11 @@ class HConvBatchNorm(HConv, HBatchNormBase):
         input_bw = self.input_bw
         if input_bw is not None:
             kernel_bw = self._kernel_bw(kq)  # type: ignore
-            bops = tf.reduce_sum(self.convolution_op(self.input_bw, kernel_bw))  # type: ignore
-            bops = bops * self.parallel_factor / self.total_channels
-            self.bops.assign(bops)
-            bops = tf.cast(bops, tf.float32) * self.beta
-            self.add_loss(tf.convert_to_tensor(bops))
+            ebops = tf.reduce_sum(self.convolution_op(self.input_bw, kernel_bw))  # type: ignore
+            ebops = ebops * self.parallel_factor / self.total_channels
+            self.ebops.assign(ebops)
+            ebops = tf.cast(ebops, tf.float32) * self.beta
+            self.add_loss(tf.convert_to_tensor(ebops))
         return a
 
     @tf.function(jit_compile=True)
@@ -358,7 +357,7 @@ class HConvBatchNorm(HConv, HBatchNormBase):
         if self.scale:
             kq = self.kernel
         else:
-            kq = self.kernel_quantizer(self.kernel, training, False)  # type: ignore
+            kq = self.kq(self.kernel, training, False)  # type: ignore
 
         z = self.convolution_op(x, kq)  # type: ignore
 
@@ -371,17 +370,17 @@ class HConvBatchNorm(HConv, HBatchNormBase):
             self.moving_variance.assign(self.momentum * self.moving_variance + (1 - self.momentum) * var)
             scale = self.bn_gamma * tf.math.rsqrt(var + self.epsilon)
             train_fused_kernel = self.kernel * scale
-            kq = self.kernel_quantizer(train_fused_kernel, training, False)  # type: ignore
+            kq = self.kq(train_fused_kernel, training, False)  # type: ignore
             z = self.convolution_op(x, kq)  # type: ignore
         else:
             scale = tf.constant(1.0, dtype=self.dtype)
 
         if self.center:
             train_fused_bias = self.bias - mean * scale  # type: ignore
-            bq = self.pre_activation_quantizer.bias_forward(train_fused_bias, training, self.channel_loc)  # type: ignore
+            bq = self.paq.bias_forward(train_fused_bias, training, self.channel_loc)  # type: ignore
             z = tf.nn.bias_add(z, bq, data_format=self._tf_data_format)  # type: ignore
 
-        z = self.pre_activation_quantizer(z, training, record_minmax)  # type: ignore
+        z = self.paq(z, training, record_minmax)  # type: ignore
         a = self.activation(z)  # type: ignore
 
         return a, kq
@@ -410,8 +409,8 @@ class HConv2DBatchNorm(HConvBatchNorm):
         trainable=True,
         name=None,
         conv_op=None,
-        kernel_quantizer_config=None,
-        pre_activation_quantizer_config=None,
+        kq_conf=None,
+        paq_conf=None,
         beta=0.,
         parallel_factor: int = 1,
         momentum=0.99,
@@ -449,8 +448,8 @@ class HConv2DBatchNorm(HConvBatchNorm):
             trainable=trainable,
             name=name,
             conv_op=conv_op,
-            kernel_quantizer_config=kernel_quantizer_config,
-            pre_activation_quantizer_config=pre_activation_quantizer_config,
+            kq_conf=kq_conf,
+            paq_conf=paq_conf,
             beta=beta,
             parallel_factor=parallel_factor,
             momentum=momentum,
@@ -492,8 +491,8 @@ class HConv1DBatchNorm(HConvBatchNorm):
         trainable=True,
         name=None,
         conv_op=None,
-        kernel_quantizer_config=None,
-        pre_activation_quantizer_config=None,
+        kq_conf=None,
+        paq_conf=None,
         beta=0.,
         parallel_factor: int = 1,
         momentum=0.99,
@@ -531,8 +530,8 @@ class HConv1DBatchNorm(HConvBatchNorm):
             trainable=trainable,
             name=name,
             conv_op=conv_op,
-            kernel_quantizer_config=kernel_quantizer_config,
-            pre_activation_quantizer_config=pre_activation_quantizer_config,
+            kq_conf=kq_conf,
+            paq_conf=paq_conf,
             beta=beta,
             parallel_factor=parallel_factor,
             momentum=momentum,

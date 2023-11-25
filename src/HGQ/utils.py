@@ -70,7 +70,7 @@ DEFAULT_PRE_ACTIVATION_QUANTIZER_CONFIG = \
     dict(init_bw=2,
          skip_dims=(0,),
          rnd_strategy='standard_round',  # 'auto': 'floor' for layer without bias or with 'relu' activation, 'standard_round' otherwise
-         exact_q_value=False,
+         exact_q_value=True,
          dtype=None,
          bw_clip=(-23, 23),
          trainable=True,
@@ -79,15 +79,15 @@ DEFAULT_PRE_ACTIVATION_QUANTIZER_CONFIG = \
          )
 
 
-def get_default_kernel_quantizer_config():
+def get_default_kq_conf():
     return DEFAULT_KERNEL_QUANTIZER_CONFIG.copy()
 
 
-def get_default_pre_activation_quantizer_config():
+def get_default_paq_config():
     return DEFAULT_PRE_ACTIVATION_QUANTIZER_CONFIG.copy()
 
 
-def set_default_kernel_quantizer_config(config):
+def set_default_kq_conf(config):
     global DEFAULT_KERNEL_QUANTIZER_CONFIG
     assert isinstance(config, dict), f'config must be a dict, got {config.__class__.__name__}'
     assert set(config.keys()) == set(DEFAULT_KERNEL_QUANTIZER_CONFIG.keys()), \
@@ -95,7 +95,7 @@ def set_default_kernel_quantizer_config(config):
     DEFAULT_KERNEL_QUANTIZER_CONFIG = config
 
 
-def set_default_pre_activation_quantizer_config(config):
+def set_default_paq_conf(config):
     global DEFAULT_PRE_ACTIVATION_QUANTIZER_CONFIG
     assert isinstance(config, dict), f'config must be a dict, got {config.__class__.__name__}'
     assert set(config.keys()) == set(DEFAULT_PRE_ACTIVATION_QUANTIZER_CONFIG.keys()), \

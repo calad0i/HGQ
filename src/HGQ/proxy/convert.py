@@ -148,7 +148,7 @@ def extract_quantizers(layer: HLayerBase | Signature, name: str, SAT='WRAP') -> 
     if isinstance(layer, Signature):
         return FixedPointQuantizer(layer.keep_negative, layer.bits, layer.int_bits, 'TRN', SAT),
 
-    quantizer = layer.pre_activation_quantizer
+    quantizer = layer.paq
     if quantizer.rnd_strategy != 3 and not layer.can_bias_cover_rnd:
         RND = 'RND'
     else:
@@ -212,7 +212,7 @@ def _(layer: ABSBaseLayer, name: str, SAT: str):
     layers = []
     proxy_layers = list(extract_keras_layers(layer, name))
 
-    if hasattr(layer, 'pre_activation_quantizer'):
+    if hasattr(layer, 'paq'):
         proxy_quantizer_layers = list(extract_quantizers(layer, name, SAT))
     if len(proxy_layers) > len(proxy_quantizer_layers) and isinstance(layer, HLayerBase):
         warn(f'Layer {layer.name} does not have a quantizer attached!')

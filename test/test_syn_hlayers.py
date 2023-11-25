@@ -5,15 +5,15 @@ from helpers import get_test_dir, run_model_test, set_seed
 from tensorflow import keras
 
 import HGQ
-from HGQ import get_default_pre_activation_quantizer_config, set_default_pre_activation_quantizer_config
+from HGQ import get_default_paq_config, set_default_paq_conf
 from HGQ.layers import HQuantize, PReshape
 
 
 def create_model(layer: str, rnd_strategy: str, io_type: str):
-    pa_config = get_default_pre_activation_quantizer_config()
+    pa_config = get_default_paq_config()
     pa_config['rnd_strategy'] = rnd_strategy
     pa_config['skip_dims'] = 'all' if io_type == 'io_stream' else 'batch'
-    set_default_pre_activation_quantizer_config(pa_config)
+    set_default_paq_conf(pa_config)
 
     inp = keras.Input(shape=(16))
     if 'Add' in layer:
@@ -31,12 +31,12 @@ def create_model(layer: str, rnd_strategy: str, io_type: str):
 
     for layer in model.layers:
         # Randomize weight bitwidths
-        if hasattr(layer, 'kernel_quantizer'):
-            fbw: tf.Variable = layer.kernel_quantizer.fbw
+        if hasattr(layer, 'kq'):
+            fbw: tf.Variable = layer.kq.fbw
             fbw.assign(tf.constant(np.random.uniform(2, 8, fbw.shape).astype(np.float32)))
         # And activation bitwidths
-        if hasattr(layer, 'pre_activation_quantizer'):
-            fbw: tf.Variable = layer.pre_activation_quantizer.fbw
+        if hasattr(layer, 'paq'):
+            fbw: tf.Variable = layer.paq.fbw
             fbw.assign(tf.constant(np.random.uniform(2, 8, fbw.shape).astype(np.float32)))
 
     return model
@@ -51,14 +51,17 @@ def get_data(N: int, sigma: float, max_scale: float, seed):
 
 @pytest.mark.parametrize('layer',
                          ["HDense(10)",
+                          "HDenseBatchNorm(10)",
                           "HConv1D(2, 3, padding='same')",
                           "HConv1D(2, 3, padding='valid')",
                           "HConv1D(2, 3, padding='valid', strides=2)",
                           "HConv1D(2, 3, padding='same', strides=2)",
+                          "HConv1DBatchNorm(2, 3, padding='valid')",
                           "HConv2D(2, (3,3), padding='same')",
                           "HConv2D(2, (3,3), padding='valid')",
                           "HConv2D(2, (3,3), padding='valid', strides=2)",
                           "HConv2D(2, (3,3), padding='same', strides=2)",
+                          "HConv2DBatchNorm(2, (3,3), padding='valid')",
                           "HAdd()",
                           "HActivation('relu')",
                           #   "HActivation('leaky_relu')",

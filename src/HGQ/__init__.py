@@ -24,7 +24,8 @@ shutup = Shutup()
 
 with shutup:
 
-    from .bops import CalibratedBOPs, FreeBOPs, ResetMinMax, trace_minmax
-    from .layers import HConv1D, HConv2D, HDense, HQuantize, PAvgPool1D, PAvgPool2D, PConcatenate, PFlatten, PMaxPool1D, PMaxPool2D, PReshape, Signature
+    from .bops import CalibratedEBOPs, FreeEBOPs, ResetMinMax, trace_minmax
+    from .layers import HConv1D, HConv1DBatchNorm, HConv2D, HConv2DBatchNorm, HDense, HDenseBatchNorm, HQuantize, PAvgPool1D, PAvgPool2D, PConcatenate, PFlatten, PMaxPool1D, PMaxPool2D, PReshape, Signature
+    from .proxy import to_proxy_model
     from .quantizer import HGQ
-    from .utils import get_default_kernel_quantizer_config, get_default_pre_activation_quantizer_config, set_default_kernel_quantizer_config, set_default_pre_activation_quantizer_config
+    from .utils import get_default_kq_conf, get_default_paq_config, set_default_kq_conf, set_default_paq_conf

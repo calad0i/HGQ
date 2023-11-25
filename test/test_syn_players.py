@@ -5,15 +5,15 @@ from helpers import get_test_dir, run_model_test, set_seed
 from tensorflow import keras
 
 import HGQ
-from HGQ import get_default_pre_activation_quantizer_config, set_default_pre_activation_quantizer_config
+from HGQ import get_default_paq_config, set_default_paq_conf
 from HGQ.layers import HConv1D, HDense, HQuantize, PAvgPool1D, PAvgPool2D, PConcatenate, PFlatten, PMaxPool1D, PMaxPool2D, PReshape
 
 
 def create_model(layer: str, rnd_strategy: str, io_type: str):
-    pa_config = get_default_pre_activation_quantizer_config()
+    pa_config = get_default_paq_config()
     pa_config['rnd_strategy'] = rnd_strategy
     pa_config['skip_dims'] = 'all' if io_type == 'io_stream' else 'batch'
-    set_default_pre_activation_quantizer_config(pa_config)
+    set_default_paq_conf(pa_config)
 
     inp = keras.Input(shape=(16))
     if 'PConcatenate' in layer:
@@ -40,8 +40,8 @@ def create_model(layer: str, rnd_strategy: str, io_type: str):
     for layer in model.layers:
         # No weight bitwidths to randomize
         # And activation bitwidths
-        if hasattr(layer, 'pre_activation_quantizer'):
-            fbw: tf.Variable = layer.pre_activation_quantizer.fbw
+        if hasattr(layer, 'paq'):
+            fbw: tf.Variable = layer.paq.fbw
             fbw.assign(tf.constant(np.random.uniform(4, 8, fbw.shape).astype(np.float32)))
 
     return model

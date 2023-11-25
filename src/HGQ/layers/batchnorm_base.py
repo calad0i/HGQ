@@ -114,15 +114,15 @@ class HBatchNormBase(HLayerBase):
     def adapt_fused_bn_kernel_bw_bits(self, x: tf.Tensor):
         """Adapt the bitwidth of the kernel quantizer to the input tensor, such that each input is represented with approximately the same number of bits after fused batchnormalization."""
         if not self.scale:
-            self.kernel_quantizer.adapt_bw_bits(self.kernel)
+            self.kq.adapt_bw_bits(self.kernel)
             return
 
-        fbw = tf.identity(self.kernel_quantizer.fbw)
-        self.kernel_quantizer.fbw.assign(tf.ones_like(fbw) * 32)
+        fbw = tf.identity(self.kq.fbw)
+        self.kq.fbw.assign(tf.ones_like(fbw) * 32)
         z = self.forward(x, training=False, record_minmax=False)
-        self.kernel_quantizer.fbw.assign(fbw)
+        self.kq.fbw.assign(fbw)
 
         var = tf.math.reduce_variance(z, axis=self._reduction_axis)
         scale = self.bn_gamma * tf.math.rsqrt(var + self.epsilon)
         fused_kernel = self.kernel * scale
-        self.kernel_quantizer.adapt_bw_bits(fused_kernel)
+        self.kq.adapt_bw_bits(fused_kernel)
