@@ -36,8 +36,8 @@ def q_round(x: tf.Tensor, strategy: int = 0):
 
 
 def get_arr_bits(arr: np.ndarray):
-    kn = (arr < 0).astype(np.int8)
     """Internal helper function to compute the position of the highest and lowest bit of an array of fixed-point integers."""
+    kn = (arr < 0).astype(np.int8)
     mul = 32  # type: ignore
     arr = arr * 2**mul
     arr = np.abs(arr)[..., None]  # type: ignore
@@ -52,6 +52,8 @@ def get_arr_bits(arr: np.ndarray):
 
 
 class HGQ:
+    """Heterogenous quantizer."""
+
     def __init__(self, init_bw: float, skip_dims, rnd_strategy: str | int = 'floor', exact_q_value=True, dtype=None, bw_clip=(-23, 23), trainable=True, regularizer=None, minmax_record=False):
         self.init_bw = init_bw
         self.skip_dims = skip_dims
