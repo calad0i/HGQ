@@ -28,6 +28,7 @@ Index
    getting_started.md
    reference.md
    qkeras.md
+   tips.md
    faq.md
 
 

@@ -35,3 +35,7 @@ Do you observe a collapse of loss value, as well as BOPs and accuracy? If so, yo
 2. Reduce or remove the regularization quantizer config.
 3. Increase `init_bw` in quantizer config.
 4. If it still doesn't work, please first verify that the Keras counterpart of your model is working properly. If it is, please feel free to contact us.
+
+## `ERROR: [XFORM 203-504] Stop unrolling loop 'SomeName'` for Vivado HLS
+
+Your layer is too big. No, actually, due to some hard-coded and yet stupid heuristic in Vivado HLS, it stops you from unrolling some large and/or nested loops regardless of whether it is actually synthesizable/large (e.g., a large but very sparse dense layer will fail). There is **NO** way to disable this check. You can try to reduce the size of your layer, or try to use `parallel_factor` for convolutional layers, or split dense layers manually.

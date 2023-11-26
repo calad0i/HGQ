@@ -13,6 +13,7 @@ import keras
 
 model = keras.models.Sequential([
     keras.layers.Reshape((28, 28, 1)),
+    keras.layers.MaxPooling2D((2, 2)),
     keras.layers.Conv2D(2, (3, 3), activation='relu'),
     keras.layers.MaxPooling2D((2, 2)),
     keras.layers.Conv2D(2, (3, 3), activation='relu'),
@@ -33,20 +34,20 @@ To quantize the model with HGQ, the following steps are required:
 2. The first layer must be a `HQuantize` or `Signature` layer.
 3. Add `ResetMinMax()` callback to the last of callbacks.
 
-
 ``` python
 from HGQ.layers import HDense, HConv2D, PMaxPooling2D, PFlatten, PReshape, HQuantize
 from HGQ import ResetMinMax, FreeBOPs
 
 model = keras.models.Sequential([
-    HQuantize(beta=1e-4),
+    HQuantize(beta=3e-5),
     PReshape((28, 28, 1)),
-    HConv2D(2, (3, 3), activation='relu', beta=1e-4),
     PMaxPooling2D((2, 2)),
-    HConv2D(2, (3, 3), activation='relu', beta=1e-4),
+    HConv2D(2, (3, 3), activation='relu', beta=3e-5, parallel_factor=144),
+    PMaxPooling2D((2, 2)),
+    HConv2D(2, (3, 3), activation='relu', beta=3e-5, parallel_factor=16),
     PMaxPooling2D((2, 2)),
     PFlatten(),
-    HDense(10, beta=1e-4)
+    HDense(10, beta=3e-5)
 ])
 
 opt = keras.optimizers.Adam(learning_rate=0.001)
@@ -57,9 +58,7 @@ callbacks = [ResetMinMax(), FreeBOPs()]
 
 The `beta` factor is a regularization factor on the number of BOPs. Higher `beta` means smaller bitwidth. The `beta` factor can be set to different values for different layers.
 
-```{note}
-This example model is likely to result in high latency. To reduce it, consider using higher `parallel_factor` for `HConv2D` layers at the cost of larger logic.
-```
+The `parallel_factor` is the number controls how many output elements are computed in parallel. In this example, the `parallel_factor` is set to match the output size, thus everything will be computed in parallel. In this case, we would have minimum latency & maximum throughput at the cost of larger logic.
 
 ```{tip}
 Though not strictly necessary, it is recommended to add `FreeBOPs()` to callbacks. This callback will add a new metric `bops` to the model, and you will be able to estimate the size of the model on the fly during training.
@@ -95,4 +94,4 @@ By almost bit-accurate, the model will be bit-accurate except for the following 
 3. For activations, bit-accuracy cannot be guaranteed. A great example of this is `softmax`. Also, unary nonlinear activations may or may not be bit-accurate with the current hls4ml implementation. Currently, if the bitwidth is very high and the input value's range is greater than a certain value, bit-accuracy will be lost due to some hardcoded LUT size in hls4ml.
 ```
 
-For a complete example, please refer to this [notebook](https://github.com/calad0i/HGQ).
+For a complete example, please refer to this [notebook](https://github.com/calad0i/HGQ/tree/v0.2/examples/mnist.ipynb).
