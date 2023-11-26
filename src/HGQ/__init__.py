@@ -1,5 +1,12 @@
 import sys
 
+try:
+    from ._version import version as __version__
+    from ._version import version_tuple
+except ImportError:
+    __version__ = "unknown version"
+    version_tuple = (0, 0, "unknown version")
+
 
 class Shutup:
     def write(self, s):
@@ -18,6 +25,9 @@ class Shutup:
     def __exit__(self, exc_type, exc_val, exc_tb):
         sys.stdout = self._original_stdout
         sys.stderr = self._original_stderr
+
+    def close(self):
+        pass
 
 
 shutup = Shutup()

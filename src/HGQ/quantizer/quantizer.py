@@ -3,7 +3,7 @@ from functools import singledispatchmethod
 import numpy as np
 import tensorflow as tf
 
-from .utils import L1, L1L2, L2, strategy_dict
+from ..utils import L1, L1L2, L2, strategy_dict
 
 two = tf.constant(2, dtype=tf.float32)
 log2 = tf.constant(np.log(2), dtype=tf.float32)
@@ -86,7 +86,7 @@ class HGQ:
             elif self.skip_dims == 'except_1st':
                 self.skip_dims = (0,) + tuple(range(2, len(input_shape)))
             else:
-                raise ValueError('skip_dims must be tuple or str in ["all", "except_last", "batch", "except_last", "none"]')
+                raise ValueError("skip_dims must be tuple or str in ['all', 'except_last', 'batch', 'except_last', 'except_1st', 'none']")
         _input_shape = list(input_shape)
         degeneracy = 1
         if self.skip_dims:

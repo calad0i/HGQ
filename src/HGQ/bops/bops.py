@@ -2,8 +2,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
-from .layers import HLayerBase
-from .utils import warn
+from ..layers import HLayerBase
+from ..utils import warn
 
 
 class FreeBOPs(tf.keras.callbacks.Callback):
@@ -39,7 +39,7 @@ class CalibratedBOPs(tf.keras.callbacks.Callback):
         data = self.calibration_data
         bsz = self.bsz or len(data)
         bops = trace_minmax(self.model, data, bsz=bsz, verbose=False)
-        logs['multi'] = bops
+        logs['bops'] = bops
 
 
 def trace_minmax(model, dataset, bsz=16384, verbose=True, return_predictions=False, no_bops_computation=False, rst=True, cover_factor=1.0):
