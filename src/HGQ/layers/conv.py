@@ -38,7 +38,7 @@ class HConv(HLayerBase, Conv):
         parallel_factor: int = 1,
         **kwargs,
     ):
-        """parallel_factor: number of parallel kernel operation to be used. Only used in ebops estimation."""
+        """parallel_factor: number of parallel kernel operation to be used. Only used in bops estimation."""
         super().__init__(
             rank=rank,
             filters=filters,
@@ -106,11 +106,11 @@ class HConv(HLayerBase, Conv):
         input_bw = self.input_bw
         if input_bw is not None:
             kernel_bw = self._kernel_bw(kq)  # type: ignore
-            ebops = tf.reduce_sum(self.convolution_op(self.input_bw, kernel_bw))  # type: ignore
-            ebops = ebops * self.parallel_factor / self.total_channels
-            self.ebops.assign(ebops)
-            ebops = tf.cast(ebops, tf.float32) * self.beta
-            self.add_loss(tf.convert_to_tensor(ebops))
+            bops = tf.reduce_sum(self.convolution_op(self.input_bw, kernel_bw))  # type: ignore
+            bops = bops * self.parallel_factor / self.total_channels
+            self.bops.assign(bops)
+            bops = tf.cast(bops, tf.float32) * self.beta
+            self.add_loss(tf.convert_to_tensor(bops))
         return a
 
     @tf.function(jit_compile=True)
@@ -130,9 +130,9 @@ class HConv(HLayerBase, Conv):
     def compute_exact_bops(self):
         kernel_bw = tf.constant(self.kernel_bw_exact, dtype=tf.float32)
         input_bw = self.input_bw  # type: ignore
-        ebops = int(tf.reduce_sum(self.convolution_op(input_bw, kernel_bw)).numpy()) * int(self.parallel_factor.numpy()) / int(self.total_channels.numpy())  # type: ignore
-        self.ebops.assign(tf.constant(ebops, dtype=tf.float32))
-        return ebops
+        bops = int(tf.reduce_sum(self.convolution_op(input_bw, kernel_bw)).numpy()) * int(self.parallel_factor.numpy()) / int(self.total_channels.numpy())  # type: ignore
+        self.bops.assign(tf.constant(bops, dtype=tf.float32))
+        return bops
 
 
 @register_keras_serializable(package="HGQ")
@@ -344,11 +344,11 @@ class HConvBatchNorm(HConv, HBatchNormBase):
         input_bw = self.input_bw
         if input_bw is not None:
             kernel_bw = self._kernel_bw(kq)  # type: ignore
-            ebops = tf.reduce_sum(self.convolution_op(self.input_bw, kernel_bw))  # type: ignore
-            ebops = ebops * self.parallel_factor / self.total_channels
-            self.ebops.assign(ebops)
-            ebops = tf.cast(ebops, tf.float32) * self.beta
-            self.add_loss(tf.convert_to_tensor(ebops))
+            bops = tf.reduce_sum(self.convolution_op(self.input_bw, kernel_bw))  # type: ignore
+            bops = bops * self.parallel_factor / self.total_channels
+            self.bops.assign(bops)
+            bops = tf.cast(bops, tf.float32) * self.beta
+            self.add_loss(tf.convert_to_tensor(bops))
         return a
 
     @tf.function(jit_compile=True)

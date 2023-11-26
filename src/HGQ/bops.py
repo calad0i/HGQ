@@ -6,17 +6,17 @@ from .layers import HLayerBase
 from .utils import warn
 
 
-class FreeEBOPs(tf.keras.callbacks.Callback):
+class FreeBOPs(tf.keras.callbacks.Callback):
     def __init__(self):
         super().__init__()
 
     def on_epoch_end(self, epoch, logs=None):
         assert self.model is not None
-        ebops = 0
+        bops = 0
         for layer in self.model.layers:
-            if hasattr(layer, 'ebops'):
-                ebops += layer.ebops.numpy()
-        logs['ebops'] = ebops  # type: ignore
+            if hasattr(layer, 'bops'):
+                bops += layer.bops.numpy()
+        logs['bops'] = bops  # type: ignore
 
 
 class ResetMinMax(tf.keras.callbacks.Callback):
@@ -27,7 +27,7 @@ class ResetMinMax(tf.keras.callbacks.Callback):
                 layer.reset_minmax()
 
 
-class CalibratedEBOPs(tf.keras.callbacks.Callback):
+class CalibratedBOPs(tf.keras.callbacks.Callback):
     def __init__(self, calibration_data, bsz=None):
         self.calibration_data = calibration_data
         self.bsz = bsz
@@ -38,11 +38,11 @@ class CalibratedEBOPs(tf.keras.callbacks.Callback):
 
         data = self.calibration_data
         bsz = self.bsz or len(data)
-        ebops = trace_minmax(self.model, data, bsz=bsz, verbose=False)
-        logs['multi'] = ebops
+        bops = trace_minmax(self.model, data, bsz=bsz, verbose=False)
+        logs['multi'] = bops
 
 
-def trace_minmax(model, dataset, bsz=16384, verbose=True, return_predictions=False, no_ebops_computation=False, rst=True, cover_factor=1.0):
+def trace_minmax(model, dataset, bsz=16384, verbose=True, return_predictions=False, no_bops_computation=False, rst=True, cover_factor=1.0):
     if rst:
         for layer in model.layers:
             if isinstance(layer, HLayerBase):
@@ -88,19 +88,19 @@ def trace_minmax(model, dataset, bsz=16384, verbose=True, return_predictions=Fal
             aq._min.assign(tf.maximum(aq._min, -tf.ones_like(aq._min)))  # type: ignore
             aq._max.assign(tf.minimum(aq._max, tf.ones_like(aq._max)))  # type: ignore
 
-    if no_ebops_computation:
+    if no_bops_computation:
         return -1
 
-    ebops = 0
+    bops = 0
     for layer in model.layers:
         if isinstance(layer, HLayerBase):
             layer.record_minmax = False
-            debops = layer.compute_exact_bops  # type: ignore
-            ebops += debops
+            dbops = layer.compute_exact_bops  # type: ignore
+            bops += dbops
             if verbose:
-                print(f'{layer.name}: {debops}')
+                print(f'{layer.name}: {dbops}')
 
     if return_predictions:
-        return ebops, np.concatenate(r, axis=0)
+        return bops, np.concatenate(r, axis=0)
 
-    return ebops
+    return bops

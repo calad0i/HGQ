@@ -43,7 +43,7 @@ class HLayerBase(ABSBaseLayer):
         self.paq_config = paq_conf or get_default_paq_config()
         "pre-activation quantizer config"
         self.beta = tf.constant(beta, dtype=tf.float32, name='beta')
-        "EBOPs-regularization strength"
+        "BOPs-regularization strength"
         self.record_minmax = False
         self._has_last_layer = False
         self._do_adapt_kernel_bits = kwargs.pop('do_adapt_kernel_bits', True)
@@ -81,7 +81,7 @@ class HLayerBase(ABSBaseLayer):
         return False
 
     def post_build(self, input_shape):
-        """This method should be called after calling build() method of the child class. It initializes the quantizers and sets the ebops variable, and set a few flags (_has_kernel, _has_bias, _relu_act) for convenience.)"""
+        """This method should be called after calling build() method of the child class. It initializes the quantizers and sets the bops variable, and set a few flags (_has_kernel, _has_bias, _relu_act) for convenience.)"""
         self._has_kernel = False
         self._has_bias = False
         if hasattr(self, 'kernel') and self.kernel is not None:
@@ -96,7 +96,7 @@ class HLayerBase(ABSBaseLayer):
         if self.paq_config['rnd_strategy'] == 'auto':
             self.paq.rnd_strategy = 0 if self.can_bias_cover_rnd else 3
 
-        self.ebops = tf.Variable(0, dtype=tf.float32, trainable=False, name='ebops')
+        self.bops = tf.Variable(0, dtype=tf.float32, trainable=False, name='bops')
 
     def init_quantizers(self, input_shape):
         """Initializes the High Granularity Quantizers for the kernel and the pre-activation values. This method is called by post_build() method."""
@@ -229,7 +229,7 @@ class HLayerBase(ABSBaseLayer):
     @property
     def compute_exact_bops(self):
         """Computes the exact bops for the layer. Non-differentiable. For post-training use."""
-        self.ebops.assign(tf.constant(0.))
+        self.bops.assign(tf.constant(0.))
         return np.float32(0.)
 
     def get_config(self):
