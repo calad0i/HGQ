@@ -1,10 +1,11 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "setuptools_scm>=8"]
+
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "HGQ"
-version = "0.2.0"
+version = "0.2.0-rc1"
 authors = [{ name = "Chang Sun", email = "chsun@cern.ch" }]
 description = "High Granularity Quantizarion for hls4ml"
 readme = "README.md"
@@ -20,3 +21,6 @@ classifiers = [
 
 [project.urls]
 repository = "https://github.com/calad0i/HGQ"
+
+[tool.setuptools_scm]
+write_to = "src/HGQ/_version.py"

@@ -1,6 +1,9 @@
 # VSCode
 .vscode
 
+# version
+_version.py
+
 # Jupyter Notebooks
 *.ipynb
 
@@ -76,6 +79,7 @@ instance/
 
 # Sphinx documentation
 docs/_build/
+docs/autodoc/
 
 # PyBuilder
 .pybuilder/

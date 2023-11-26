@@ -23,14 +23,15 @@ The following conditions must be met:
 
 If you meet all the above conditions, you can probably use HGQ to quantize your model.
 
-## How do I get started?
-
-Please refer to the [usage guide](./usage_guide.md) for more details.
-
 ## What's the status of the project?
 
 The project is still under development. The codebase and documentation are not stable yet, and we are working on it. If you have any questions, please feel free to contact us.
 
-## How do I cite this work?
+## I'm getting terrible results during/after training, what should I do?
 
-The paper is not available yet. Please check back later.
+Do you observe a collapse of loss value, as well as BOPs and accuracy? If so, you may want to try the following:
+
+1. Reduce `beta` in `H-` layers.
+2. Reduce or remove the regularization quantizer config.
+3. Increase `init_bw` in quantizer config.
+4. If it still doesn't work, please first verify that the Keras counterpart of your model is working properly. If it is, please feel free to contact us.
