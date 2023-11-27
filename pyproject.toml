@@ -19,8 +19,23 @@ classifiers = [
   "Development Status :: 4 - Beta",
 ]
 
+dependencies = ['tensorflow==2.13', 'numpy>=1.23']
+
 [project.urls]
 repository = "https://github.com/calad0i/HGQ"
 
 [tool.setuptools_scm]
 write_to = "src/HGQ/_version.py"
+
+[project.optional-dependencies]
+doc = ["sphinx", "sphinx-rtd-theme", "myst-parser", "qkeras", "pyparsing"]
+
+test = [
+  # "git+https://github.com/calad0i/hls4ml@HGQ-integration",
+  "qkeras",
+  "pytest",
+  "pytest-xdist",
+  "pytest-env",
+  "pytest-cov",
+  "pyparsing",
+]
