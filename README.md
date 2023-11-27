@@ -3,7 +3,7 @@
 
 # High Granularity Quantization
 
-HGQ is a framework for quantization aware training of neural works to be deployed on FPGAs, which allows for per-weight and per-activation bitwidth optimization.
+HGQ is a framework for quantization aware training of neural networks to be deployed on FPGAs, which allows for per-weight and per-activation bitwidth optimization.
 
 Depending on the specific [application](https://arxiv.org/abs/2006.10159), HGQ could achieve up to 10x resource reduction compared to the traditional `AutoQkeras` approach, while maintaining the same accuracy. For some more challenging [tasks](https://arxiv.org/abs/2202.04976), where the model is already under-fitted, HGQ could still improve the performance under the same on-board resource consumption. For more details, please refer to our paper (link coming not too soon).
 
