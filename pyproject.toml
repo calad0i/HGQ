@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 name = "HGQ"
 version = "0.2.0-rc1"
 authors = [{ name = "Chang Sun", email = "chsun@cern.ch" }]
-description = "High Granularity Quantizarion for hls4ml"
+description = "High Granularity Quantizarion"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 license = { file = "LICENSE" }
