@@ -1,4 +1,4 @@
-name: Sphinx document with GitHub Pages dependencies preinstalled
+name: Documentation
 
 on:
   # Runs on pushes targeting the default branch
