@@ -23,8 +23,16 @@ Due to the default behavior of `QKeras` quantizer, it is strongly recommended to
 Not all QKeras layers are not supported, such as `QConv*DBatchNorm`. If the model contains such layers, the conversion will fail.
 ```
 
-```{warning}
-The pre-requisite of this conversion is that the `QKeras` model must be a model that may be converted to a hls4ml model in a bit-accurate manner. This means that the input must be followed directly by a `QActivation` layer with a `quantized_bits` activation. If this is not the case, the conversion will fail.
 
-Also, if the quantizer for any parameter is not set, the framework will try to derive a bitwidth that will produce a bit-accurate model. However, this may result in a huge bitwidth **silently without warning**. Hence, before running synthesis, it is strongly recommended to check the bitwidth manually.
+```{warning}
+The pre-requisite of this conversion is that the `QKeras` model must be a model that may be converted to a hls4ml model in a bit-accurate manner. This has two major implications:
+
+1. All inputs must be followed immediately by a `QActivation` layer with a `quantized_bits` activation to mark the input precision.
+2. All quantizers, when applicable, must have `alpha=1`. The default arbitrary power-of-two scaling is NOT achievable in hls4ml.
+
+If these conditions are not met, the conversion will fail.
+
+Also, if the quantizer for any parameter is missing, the framework will try to derive a bitwidth that will produce a bit-accurate model. However, this may result in a huge bitwidth **silently without warning**. Hence, before running synthesis, it is strongly recommended to check the bitwidth manually.
 ```
+
+You can find an example of this conversion in [this notebook](https://github.com/calad0i/HGQ/tree/master/examples/qkeras.ipynb).

@@ -39,11 +39,7 @@ jobs:
         run: |
           cd docs
           make html
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
-        with:
-          # Upload entire repository
-          path: 'docs/_build/html'
+
   # Deployment job
   deploy:
     environment:
@@ -52,6 +48,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: 'docs/_build/html'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2

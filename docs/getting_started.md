@@ -94,4 +94,4 @@ By almost bit-accurate, the model will be bit-accurate except for the following 
 3. For activations, bit-accuracy cannot be guaranteed. A great example of this is `softmax`. Also, unary nonlinear activations may or may not be bit-accurate with the current hls4ml implementation. Currently, if the bitwidth is very high and the input value's range is greater than a certain value, bit-accuracy will be lost due to some hardcoded LUT size in hls4ml.
 ```
 
-For a complete example, please refer to this [notebook](https://github.com/calad0i/HGQ/tree/v0.2/examples/mnist.ipynb).
+For a complete example, please refer to this [notebook](https://github.com/calad0i/HGQ/tree/master/examples/mnist.ipynb).
