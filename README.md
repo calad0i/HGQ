@@ -1,4 +1,7 @@
-# High Granularity Quantization for Ultra-Fast Inference on FPGAs
+<img src="docs/_static/logo.svg" alt="HGQ-logo" width="230"/>
+
+
+# High Granularity Quantization
 
 HGQ is a method for quantization aware training of neural works to be deployed on FPGAs, which allows for per-weight and per-activation bitwidth optimization.
 
@@ -8,8 +11,5 @@ This repository implements HGQ for `tensorflow.keras` models. It is independent 
 
 Notice: this repository is still under development, and the API might change in the future.
 
-## This package is still under development. Any API might change without notice at any time
 
-## Documentation
-
-Available [Here](https://placeholder.com).
+## This package is still under development. Any API might change without notice at any time!
