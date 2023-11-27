@@ -110,7 +110,7 @@ def qlayer_to_keras_layer(layer: keras.layers.Layer, name) -> keras.layers.Layer
     klayer.trainable = False
     klayer.build(layer.input_shape)
     if hasattr(layer, 'kernel'):
-        q = layer.kq_internal or (lambda x: x)
+        q = layer.kernel_quantizer_internal or (lambda x: x)
         klayer.kernel.assign(q(layer.kernel))
     if hasattr(layer, 'bias'):
         q = layer.bias_quantizer_internal or (lambda x: x)
