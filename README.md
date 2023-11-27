@@ -9,7 +9,8 @@ Depending on the specific [application](https://arxiv.org/abs/2006.10159), HGQ c
 
 This repository implements HGQ for `tensorflow.keras` models. It is independent of the [QKeras project](https://github.com/google/qkeras).
 
-Notice: this repository is still under development, and the API might change in the future.
+## Warning:
 
+This framework requires an **unmerged** [PR](https://github.com/fastmachinelearning/hls4ml/pull/914) of hls4ml. Please install it by running `pip install "git+https://github.com/calad0i/hls4ml@HGQ-integration"`. Or, conversion will fail with unsupported layer error.
 
 ## This package is still under development. Any API might change without notice at any time!

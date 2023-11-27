@@ -4,6 +4,10 @@
 
 `pip install git+https://github.com/calad0i/HGQ` to install the latest version from github.
 
+```{warning}
+This framework requires an **unmerged** [PR](https://github.com/fastmachinelearning/hls4ml/pull/914) of hls4ml. Please install it by running `pip install "git+https://github.com/calad0i/hls4ml@HGQ-integration"`. Or, conversion will fail with unsupported layer error.
+```
+
 ```{note}
 The current varsion requires an **unmerged** version of hls4ml. Please install it by running `pip install git+https://github.com/calad0i/hls4ml`.
 ```
