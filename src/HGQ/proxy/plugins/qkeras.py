@@ -93,9 +93,12 @@ def qlayer_to_keras_layer(layer: keras.layers.Layer, name) -> keras.layers.Layer
         raise ValueError(f"Cannot find corresponding keras layer for {layer.__class__.__name__}")
     base_cls = getattr(keras.layers, base_cls_name)
     conf = layer.get_config()
-    activation = conf.get('activation')
-    if activation is not None:
-        if activation.__class__ in qkeras_quantizers:
+
+    # For some ridiculous reason, QAactivation's activation is called quantizer
+    # Yet, all other layers are call their activation activation.
+    if isinstance(layer, (qkeras.QActivation, keras.layers.Activation)):
+        quantizer = layer.quantizer if isinstance(layer, qkeras.QActivation) else layer.activation
+        if quantizer.__class__ in qkeras_quantizers:
             return None
 
     blacklist = ('quantize', 'kernel_range', 'bias_range', 'constraint', 'activation', 'initializer')
@@ -118,13 +121,13 @@ def qlayer_to_keras_layer(layer: keras.layers.Layer, name) -> keras.layers.Layer
     return klayer
 
 
-def qkeras_to_proxy_layers(layer: keras.layers.Layer, name: str, SAT: str) -> tuple[keras.layers.Layer, ...]:
+def qlayer_to_proxy_layers(layer: keras.layers.Layer, name: str, SAT: str) -> tuple[keras.layers.Layer, ...]:
     klayer = qlayer_to_keras_layer(layer, name)
     if not hasattr(layer, 'activation'):
         assert klayer is not None
         return klayer,
 
-    activation = layer.activation
+    activation = layer.quantizer if hasattr(layer, 'quantizer') else layer.activation
     act_layers = qkeras_quantizer_to_layers(activation, SAT)
     if klayer is not None:
         return klayer, *act_layers
@@ -141,5 +144,5 @@ for layer_cls in qkeras_layers:
 
 
 def init():
-    to_proxy_layers.register(QKerasBaseLayer, qkeras_to_proxy_layers)
+    to_proxy_layers.register(QKerasBaseLayer, qlayer_to_proxy_layers)
     get_produced_kif.register(qkeras.QActivation, get_produced_kif.registry[keras.layers.Activation])

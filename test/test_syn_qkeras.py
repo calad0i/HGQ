@@ -16,7 +16,7 @@ def create_model():
     l = lambda X: qkeras.QDense(X, kernel_quantizer='quantized_bits(8, 3, alpha=1.)', activation='quantized_bits(5, 3, alpha=1.)', bias_quantizer='quantized_bits(8, 3, alpha=1)')
     c = lambda X: qkeras.QConv2D(X, 2, kernel_quantizer=quantizers.quantized_bits(8, 3, alpha=1.), activation=quantizers.quantized_bits(6, 1, alpha=1., symmetric=True), bias_quantizer=quantizers.quantized_bits(8, 3, alpha=1))
     r = lambda X: keras.layers.Activation('relu')(X)
-    rr = lambda X: qkeras.QActivation(qkeras.quantized_relu(5, 3))(X)
+    rr = lambda X: qkeras.QActivation('quantized_relu(5, 3)')(X)
 
     L = l(10)
 
