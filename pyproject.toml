@@ -28,7 +28,7 @@ repository = "https://github.com/calad0i/HGQ"
 write_to = "src/HGQ/_version.py"
 
 [project.optional-dependencies]
-doc = ["sphinx", "sphinx-rtd-theme", "myst-parser", "qkeras", "pyparsing"]
+docs = ["sphinx", "sphinx-rtd-theme", "myst-parser", "qkeras", "pyparsing"]
 
 test = [
   # "git+https://github.com/calad0i/hls4ml@HGQ-integration",
