@@ -126,14 +126,14 @@ def _run_gradient_test(model, data):
 
 def run_model_test(model: keras.Model, cover_factor: float | None, data, io_type: str, backend: str, dir: str, aggressive: bool, no_exact_match: bool = False, skip_sl_test=False, test_gard=False):
     data_len = data.shape[0] if isinstance(data, np.ndarray) else data[0].shape[0]
+    if test_gard:
+        _run_gradient_test(model, data)
     if cover_factor is not None:
         trace_minmax(model, data, cover_factor=cover_factor, bsz=data_len)
     proxy = to_proxy_model(model, aggressive=aggressive)
     try:
         if not skip_sl_test:
             _run_model_sl_test(model, proxy, data, dir)
-        if test_gard:
-            _run_gradient_test(model, data)
         _run_model_proxy_match_test(model, proxy, data, cover_factor)
         _run_synth_match_test(proxy, data, io_type, backend, dir)
     except AssertionError as e:

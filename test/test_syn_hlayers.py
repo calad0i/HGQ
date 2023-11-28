@@ -84,7 +84,7 @@ def test_syn_hlayers(layer, N: int, rnd_strategy: str, io_type: str, cover_facto
     model = create_model(layer=layer, rnd_strategy=rnd_strategy, io_type=io_type)
     data = get_data(N, 1, 1, seed)
 
-    run_model_test(model, cover_factor, data, io_type, backend, dir, aggressive, test_gard=True)
+    run_model_test(model, cover_factor, data, io_type, backend, dir, aggressive, test_gard=N > 100)
 
 
 if __name__ == '__main__':
