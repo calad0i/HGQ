@@ -75,7 +75,7 @@ def parallel_avg_pool_cond(a, b):
                              "PMaxPool2D((2,2), padding='same')",
                              "PMaxPool1D(2, padding='valid')",
                              "PMaxPool2D((2,2), padding='valid')",
-                             "Signature(1,6,3)"
+                             "Signature(1,6,3)",
                              "PAvgPool1D(2, padding='same')",
                              "PAvgPool2D((1,2), padding='same')",
                              "PAvgPool2D((2,2), padding='same')",
