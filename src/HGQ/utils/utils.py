@@ -13,9 +13,6 @@ class L1:
     def __call__(self, x):
         return tf.reduce_sum(x) * self.l1
 
-    def __name__(self):
-        return f'L1'
-
     def get_config(self):
         return {'l1': self.l1}
 
@@ -28,9 +25,6 @@ class L2:
 
     def __call__(self, x):
         return tf.reduce_sum(tf.square(x - self.zero)) * self.l2
-
-    def __name__(self):
-        return f'L2'
 
     def get_config(self):
         return {'l2': self.l2, 'zero': self.zero}
@@ -46,9 +40,6 @@ class L1L2:
 
     def __call__(self, x):
         return tf.reduce_sum(x) * self.l1 + tf.reduce_sum(tf.square(x - self.l2_zero)) * self.l2
-
-    def __name__(self):
-        return f'L1L2'
 
     def get_config(self):
         return {'l1': self.l1, 'l2': self.l2, 'l2_zero': self.l2_zero}

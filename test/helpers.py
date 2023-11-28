@@ -34,7 +34,7 @@ def get_test_dir() -> str:
     return test_dir
 
 
-def _run_synth_match_test(proxy: keras.Model, data, io_type: str, backend: str, dir: str):
+def _run_synth_match_test(proxy: keras.Model, data, io_type: str, backend: str, dir: str, cond=None):
 
     output_dir = dir + '/hls4ml_prj'
     hls_model = convert_from_keras_model(
@@ -58,9 +58,12 @@ def _run_synth_match_test(proxy: keras.Model, data, io_type: str, backend: str, 
 
     errors = []
     for i, (p, h) in enumerate(zip(r_proxy, r_hls)):
-        mismatch_ph = p != h
         try:
-            assert np.sum(mismatch_ph) == 0, f"Proxy-HLS4ML mismatch for out {i}: {np.sum(np.any(mismatch_ph,axis=1))} out of {data_len} samples are different. Sample: {p[mismatch_ph].ravel()[:5]} vs {h[mismatch_ph].ravel()[:5]}"
+            if cond is None:
+                mismatch_ph = p != h
+                assert np.sum(mismatch_ph) == 0, f"Proxy-HLS4ML mismatch for out {i}: {np.sum(np.any(mismatch_ph,axis=1))} out of {data_len} samples are different. Sample: {p[mismatch_ph].ravel()[:5]} vs {h[mismatch_ph].ravel()[:5]}"
+            else:
+                cond(p, h)
         except AssertionError as e:
             errors.append(e)
     if len(errors) > 0:
@@ -124,7 +127,7 @@ def _run_gradient_test(model, data):
         assert tf.reduce_any(g != 0), f"Gradient for {w.name} is zero"
 
 
-def run_model_test(model: keras.Model, cover_factor: float | None, data, io_type: str, backend: str, dir: str, aggressive: bool, no_exact_match: bool = False, skip_sl_test=False, test_gard=False):
+def run_model_test(model: keras.Model, cover_factor: float | None, data, io_type: str, backend: str, dir: str, aggressive: bool, cond=None, skip_sl_test=False, test_gard=False):
     data_len = data.shape[0] if isinstance(data, np.ndarray) else data[0].shape[0]
     if test_gard:
         _run_gradient_test(model, data)
@@ -135,7 +138,7 @@ def run_model_test(model: keras.Model, cover_factor: float | None, data, io_type
         if not skip_sl_test:
             _run_model_sl_test(model, proxy, data, dir)
         _run_model_proxy_match_test(model, proxy, data, cover_factor)
-        _run_synth_match_test(proxy, data, io_type, backend, dir)
+        _run_synth_match_test(proxy, data, io_type, backend, dir, cond=cond)
     except AssertionError as e:
         raise e
     except Warning as w:

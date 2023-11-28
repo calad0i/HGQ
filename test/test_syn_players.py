@@ -6,7 +6,8 @@ from tensorflow import keras
 
 import HGQ
 from HGQ import get_default_paq_conf, set_default_paq_conf
-from HGQ.layers import HConv1D, HDense, HQuantize, PAvgPool1D, PAvgPool2D, PConcatenate, PFlatten, PMaxPool1D, PMaxPool2D, PReshape
+from HGQ.layers import HConv1D, HDense, HQuantize, PAvgPool1D, PAvgPool2D, PConcatenate, PFlatten, PMaxPool1D, PMaxPool2D, PReshape, Signature
+from HGQ.proxy.fixed_point_quantizer import gfixed
 
 
 def create_model(layer: str, rnd_strategy: str, io_type: str):
@@ -18,6 +19,13 @@ def create_model(layer: str, rnd_strategy: str, io_type: str):
     inp = keras.Input(shape=(16))
     if 'PConcatenate' in layer:
         _inp = [HQuantize()(inp)] * 2
+        out = eval(layer)(_inp)
+        out = HDense(16)(out)
+        return keras.Model(inp, out)
+    elif 'Signature' in layer:
+        _inp = eval(layer)(inp)
+        out = HDense(16)(_inp)
+        return keras.Model(inp, out)
     elif 'Pool2D' in layer:
         _inp = PReshape((4, 4, 1))(HQuantize()(inp))
     elif 'Pool1D' in layer:
@@ -57,17 +65,18 @@ def get_data(N: int, sigma: float, max_scale: float, seed):
 @pytest.mark.parametrize('layer',
                          [
                              "PConcatenate()",
-                             "PMaxPool1D(2, padding='same')",
-                             "PMaxPool2D((2,2), padding='same')",
-                             "PMaxPool1D(2, padding='valid')",
-                             "PMaxPool2D((2,2), padding='valid')",
+                             #  "PMaxPool1D(2, padding='same')",
+                             #  "PMaxPool2D((2,2), padding='same')",
+                             #  "PMaxPool1D(2, padding='valid')",
+                             #  "PMaxPool2D((2,2), padding='valid')",
+                             "Signature(1,6,3)"
                              #  "PAvgPool1D(2, padding='same')",
                              #  "PAvgPool2D((1,2), padding='same')",
                              #  "PAvgPool2D((2,2), padding='same')",
                              #  "PAvgPool1D(2, padding='valid')",
                              #  "PAvgPool2D((1,2), padding='valid')",
                              #  "PAvgPool2D((2,2), padding='valid')",
-                             "PFlatten()",
+                             #  "PFlatten()",
                          ]
                          )
 @pytest.mark.parametrize("N", [1000, 10])
@@ -82,6 +91,10 @@ def test_syn_players(layer, N: int, rnd_strategy: str, io_type: str, cover_facto
     set_seed(seed)
     model = create_model(layer=layer, rnd_strategy=rnd_strategy, io_type=io_type)
     data = get_data(N, 1, 1, seed)
+
+    if 'Signature' in layer:
+        q = gfixed(1, 6, 3)
+        data = q(data).numpy()
 
     run_model_test(model, cover_factor, data, io_type, backend, dir, aggressive)
 

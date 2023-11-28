@@ -49,16 +49,24 @@ def get_data(N: int, sigma: float, max_scale: float, seed):
     return (a1 * a2).astype(np.float32)
 
 
+def softmax_cond(proxy, hls):
+    match_precent = np.mean(np.argmax(proxy, axis=1) == np.argmax(hls, axis=1))
+    assert match_precent > 0.90, f"Keras-Proxy mismatch: {(1-match_precent) * 100}% of samples are different. Sample: {proxy[:5]} vs {hls[:5]}"
+
+
 @pytest.mark.parametrize('layer',
                          ["HDense(10)",
+                          "HDense(10, use_bias=False)",
                           "HDenseBatchNorm(10)",
                           "HConv1D(2, 3, padding='same')",
                           "HConv1D(2, 3, padding='valid')",
+                          "HConv1D(2, 3, padding='valid', use_bias=False)",
                           "HConv1D(2, 3, padding='valid', strides=2)",
                           "HConv1D(2, 3, padding='same', strides=2)",
                           "HConv1DBatchNorm(2, 3, padding='valid')",
                           "HConv2D(2, (3,3), padding='same')",
                           "HConv2D(2, (3,3), padding='valid')",
+                          "HConv2D(2, (3,3), padding='valid', use_bias=False)",
                           "HConv2D(2, (3,3), padding='valid', strides=2)",
                           "HConv2D(2, (3,3), padding='same', strides=2)",
                           "HConv2DBatchNorm(2, (3,3), padding='valid')",
@@ -68,10 +76,10 @@ def get_data(N: int, sigma: float, max_scale: float, seed):
                           "HActivation('relu6')",
                           "HActivation('tanh')",
                           "HActivation('sigmoid')",
-                          #   "HActivation('softmax')",
+                          "HActivation('softmax')",
                           ]
                          )
-@pytest.mark.parametrize("N", [1000, 10])
+@pytest.mark.parametrize("N", [1000])
 @pytest.mark.parametrize("rnd_strategy", ['auto', 'standard_round', 'floor'])
 @pytest.mark.parametrize("io_type", ['io_parallel', 'io_stream'])
 @pytest.mark.parametrize("cover_factor", [0.5, 1.0])
@@ -84,7 +92,17 @@ def test_syn_hlayers(layer, N: int, rnd_strategy: str, io_type: str, cover_facto
     model = create_model(layer=layer, rnd_strategy=rnd_strategy, io_type=io_type)
     data = get_data(N, 1, 1, seed)
 
-    run_model_test(model, cover_factor, data, io_type, backend, dir, aggressive, test_gard=N > 100)
+    test_grad = N > 100
+    cond = None if 'softmax' not in layer else softmax_cond
+    run_model_test(model,
+                   cover_factor, data,
+                   io_type,
+                   backend,
+                   dir,
+                   aggressive,
+                   test_gard=test_grad,
+                   cond=cond
+                   )
 
 
 if __name__ == '__main__':

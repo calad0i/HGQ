@@ -50,19 +50,12 @@ class HActivation(HLayerBase, tf.keras.layers.Activation):
 
         super().post_build(input_shape)
 
-    # @tf.function(jit_compile=True)
     def __forward(self, x, training=None, record_minmax=None):
         x = self.activation(x)  # type: ignore
         return self.paq(x, training=training, record_minmax=record_minmax)  # type: ignore
 
     def compute_output_shape(self, input_shape):
         return input_shape
-
-    @property
-    def table_container(self) -> str:
-        if self.activation is not tf.keras.activations.softmax:
-            return self.result_container
-        return 'ap_fixed<18,8,AP_RND>'  # No bit-match for softmax anyway, just maxout it for now.
 
 
 @register_keras_serializable(package="HGQ")

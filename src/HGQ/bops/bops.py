@@ -72,6 +72,8 @@ def trace_minmax(model, dataset, bsz=16384, verbose=True, return_predictions=Fal
     for layer in model.layers:
         if not hasattr(layer, 'activation'):
             continue
+        if not isinstance(layer, HLayerBase):
+            continue
         aq = layer.paq
         if layer.activation is tf.keras.activations.softmax:
             # softmax_lut behaves slightly differently from softmax, which is more likely to generate exact 1s. Overflows may occur with traced min-max.

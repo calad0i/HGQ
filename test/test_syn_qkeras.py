@@ -24,6 +24,8 @@ def create_model():
     q_inp = qkeras.QActivation(qkeras.quantized_bits(8, 4, alpha=1.))(inp)
     out = L(q_inp)
     out1 = L(out)
+    out1 = r(out1)
+    out1 = L(out1)
     out2 = l(20)(out1)
     out2 = r(out2)
     out3 = l(20)(out2)

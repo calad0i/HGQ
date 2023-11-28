@@ -25,6 +25,7 @@ class ABSBaseLayer(tf.keras.layers.Layer):
 
     @property
     def input_bw(self):
+        assert len(self._inbound_nodes) <= 1, f"Layer {self.name} is reused {len(self._inbound_nodes)} times. This is not allowed."
         try:
             return self.last_layer.act_bw
         except AssertionError:

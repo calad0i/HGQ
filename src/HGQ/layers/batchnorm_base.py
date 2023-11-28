@@ -84,17 +84,6 @@ class HBatchNormBase(HLayerBase):
         else:
             self.bn_gamma = self.moving_variance = tf.Variable(1.0, trainable=False)
 
-    @tf.function(jit_compile=True)
-    def update_ema(self, z):
-        """z is the final output AFTER batchnorm. Thus, it is necessary to undo the batchnorm to get the original input, compute the mean and variance, and then update the ema"""
-
-        if self.scale:
-            batch_var = tf.math.reduce_variance(z, axis=0)
-            self.moving_variance.assign(self.momentum * self.moving_variance + (1 - self.momentum) * batch_var)
-        if self.center:
-            batch_mean = tf.math.reduce_mean(z, axis=0)
-            self.moving_mean.assign(self.momentum * self.moving_mean + (1 - self.momentum) * batch_mean)
-
     @property
     @tf.function(jit_compile=True)
     def fused_kernel(self):

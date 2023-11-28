@@ -23,20 +23,19 @@ class PLayerBase(ABSBaseLayer):
         input_bw = tf.reshape(self.input_bw, shape)
         return tf.ensure_shape(input_bw, shape)
 
-    @property
-    def act_container(self) -> str:
-        return self.last_layer.act_container
-
-    @property
-    def result_container(self) -> str:
-        return self.act_container
-
 
 @register_keras_serializable(package="HGQ")
 class Signature(PLayerBase):
 
     def __init__(self, keep_negative, bits, int_bits, **kwargs):
         super().__init__(**kwargs)
+        if not hasattr(keep_negative, 'shape'):
+            keep_negative = tf.constant(keep_negative, dtype=tf.int8)
+        if not hasattr(bits, 'shape'):
+            bits = tf.constant(bits, dtype=tf.int8)
+        if not hasattr(int_bits, 'shape'):
+            int_bits = tf.constant(int_bits, dtype=tf.int8)
+
         self.bits = bits
         self.int_bits = int_bits
         self.keep_negative = keep_negative
@@ -57,21 +56,13 @@ class Signature(PLayerBase):
         return tf.keras.backend.cast_to_floatx(self.bits)
 
     @property
-    def act_container(self) -> str:
-        k = self.keep_negative.numpy().max().astype(bool).item()  # type: ignore
-        i = self.int_bits.numpy().max().astype(int).item()  # type: ignore
-        b = self.bits.numpy().max().astype(int).item()  # type: ignore
-        f = b - i - k
-        return tuple_to_apf((k, i, f))
-
-    @property
     def input_bw(self):
         raise ValueError('Signature layer does not have input_bw')
 
     def get_config(self):
         return {
             'name': self.name,
-            'cat': self.keep_negative.numpy().tolist(),  # type: ignore
+            'keep_negative': self.keep_negative.numpy().tolist(),  # type: ignore
             'bits': self.bits.numpy().tolist(),  # type: ignore
             'int_bits': self.int_bits.numpy().tolist(),  # type: ignore
         }
@@ -99,20 +90,10 @@ class PConcatenate(tf.keras.layers.Concatenate, PLayerBase):
 
     @property
     def input_bw(self):
-        if len(self._inbound_nodes) <= 1:
-            raise ValueError("Concatenate layer should have at least two inputs")
+        assert len(self._inbound_nodes) <= 1, f"Layer {self.name} is reused {len(self._inbound_nodes)} times. This is not allowed."
+        assert len(self._inbound_nodes[0].inbound_layers) > 1, "Concatenate layer should have at least two inputs"
         input_bws = [l.act_bw for l in self._inbound_nodes[0].inbound_layers]
         return tf.concat(input_bws, axis=self.axis)
-
-    @property
-    def act_container(self) -> str:
-        if not self._inbound_nodes:
-            raise ValueError(f"Layer {self.name} does not have inbound nodes")
-
-        input_containers = np.array([apf_to_tuple(l.act_container) for l in self._inbound_nodes[0].inbound_layers])
-
-        container = tuple_to_apf(tuple(np.max(input_containers, axis=0)))
-        return container
 
 
 @register_keras_serializable(package="HGQ")

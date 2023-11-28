@@ -61,18 +61,16 @@ def get_weight(layer: keras.layers.Layer, name: str):
 
 def copy_fused_weights(src: keras.layers.Layer, dst: keras.layers.Layer):
     """For HGQ layers, some layers may have different fused weights for kernel and bias (Processed weights are deployment). This function copies the fused kernel and bias to the keras proxy."""
-    if hasattr(dst, 'kernel'):
+    if hasattr(dst, 'kernel') and dst.kernel is not None:
         if (k := getattr(src, 'fused_qkernel', None)) is not None:
             dst.kernel.assign(k)
         else:
             dst.kernel.assign(src.kernel)
-    if hasattr(dst, 'bias'):
+    if hasattr(dst, 'bias') and dst.bias is not None:
         if (b := getattr(src, 'fused_qbias', None)) is not None:
             dst.bias.assign(b)
-        elif (b := getattr(src, 'bias', None)) is not None:
-            dst.bias.assign(b)
         else:
-            warn(f'No bias found for layer {src.name}.')
+            dst.bias.assign(src.bias)
     for dst_w in dst.weights:
         if 'kernel:0' in dst_w.name or 'bias:0' in dst_w.name:
             continue
@@ -212,7 +210,7 @@ def _(layer: ABSBaseLayer, name: str, SAT: str):
     layers = []
     proxy_layers = list(extract_keras_layers(layer, name))
 
-    if hasattr(layer, 'paq'):
+    if hasattr(layer, 'paq') or isinstance(layer, Signature):
         proxy_quantizer_layers = list(extract_quantizers(layer, name, SAT))
     if len(proxy_layers) > len(proxy_quantizer_layers) and isinstance(layer, HLayerBase):
         warn(f'Layer {layer.name} does not have a quantizer attached!')
