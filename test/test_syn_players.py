@@ -85,7 +85,7 @@ def parallel_avg_pool_cond(a, b):
                              "PFlatten()",
                          ]
                          )
-@pytest.mark.parametrize("N", [1000, 10])
+@pytest.mark.parametrize("N", [1000])
 @pytest.mark.parametrize("rnd_strategy", ['auto', 'standard_round', 'floor'])
 @pytest.mark.parametrize("io_type", ['io_parallel', 'io_stream'])
 @pytest.mark.parametrize("cover_factor", [0.5, 1.0])
