@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
+tf.config.experimental_run_functions_eagerly(True)
 tf.config.threading.set_inter_op_parallelism_threads(1)  # noqa
 tf.config.threading.set_intra_op_parallelism_threads(1)  # noqa
 
