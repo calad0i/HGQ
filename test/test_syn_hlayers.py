@@ -5,12 +5,12 @@ from helpers import get_test_dir, run_model_test, set_seed
 from tensorflow import keras
 
 import HGQ
-from HGQ import get_default_paq_config, set_default_paq_conf
+from HGQ import get_default_paq_conf, set_default_paq_conf
 from HGQ.layers import HQuantize, PReshape
 
 
 def create_model(layer: str, rnd_strategy: str, io_type: str):
-    pa_config = get_default_paq_config()
+    pa_config = get_default_paq_conf()
     pa_config['rnd_strategy'] = rnd_strategy
     pa_config['skip_dims'] = 'all' if io_type == 'io_stream' else 'batch'
     set_default_paq_conf(pa_config)
@@ -84,7 +84,7 @@ def test_syn_hlayers(layer, N: int, rnd_strategy: str, io_type: str, cover_facto
     model = create_model(layer=layer, rnd_strategy=rnd_strategy, io_type=io_type)
     data = get_data(N, 1, 1, seed)
 
-    run_model_test(model, cover_factor, data, io_type, backend, dir, aggressive)
+    run_model_test(model, cover_factor, data, io_type, backend, dir, aggressive, test_gard=True)
 
 
 if __name__ == '__main__':

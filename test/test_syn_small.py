@@ -7,13 +7,13 @@ import tensorflow as tf
 from helpers import get_test_dir, run_model_test, set_seed
 from tensorflow import keras
 
-from HGQ import get_default_paq_config, set_default_paq_conf
+from HGQ import get_default_paq_conf, set_default_paq_conf
 from HGQ.layers import HActivation, HAdd, HConv1D, HConv2D, HDense, HQuantize, PConcatenate, PDropout, PFlatten, PMaxPool1D, PMaxPool2D, PReshape
 
 
 def create_model(rnd_strategy: str, io_type: str):
 
-    pa_config = get_default_paq_config()
+    pa_config = get_default_paq_conf()
     pa_config['skip_dims'] = 'all' if io_type == 'io_stream' else 'batch'
     pa_config['rnd_strategy'] = rnd_strategy
     set_default_paq_conf(pa_config)

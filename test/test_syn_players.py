@@ -5,12 +5,12 @@ from helpers import get_test_dir, run_model_test, set_seed
 from tensorflow import keras
 
 import HGQ
-from HGQ import get_default_paq_config, set_default_paq_conf
+from HGQ import get_default_paq_conf, set_default_paq_conf
 from HGQ.layers import HConv1D, HDense, HQuantize, PAvgPool1D, PAvgPool2D, PConcatenate, PFlatten, PMaxPool1D, PMaxPool2D, PReshape
 
 
 def create_model(layer: str, rnd_strategy: str, io_type: str):
-    pa_config = get_default_paq_config()
+    pa_config = get_default_paq_conf()
     pa_config['rnd_strategy'] = rnd_strategy
     pa_config['skip_dims'] = 'all' if io_type == 'io_stream' else 'batch'
     set_default_paq_conf(pa_config)

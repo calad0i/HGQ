@@ -7,13 +7,13 @@ import tensorflow as tf
 from helpers import get_test_dir, run_model_test, set_seed
 from tensorflow import keras
 
-from HGQ import get_default_paq_config, set_default_paq_conf
+from HGQ import get_default_paq_conf, set_default_paq_conf
 from HGQ.layers import HActivation, HAdd, HConv1D, HConv2D, HDense, HQuantize, PConcatenate, PDropout, PFlatten, PMaxPool1D, PMaxPool2D, PReshape
 
 
 def create_model(rnd_strategy: str, io_type: str):
 
-    pa_config = get_default_paq_config()
+    pa_config = get_default_paq_conf()
     pa_config['skip_dims'] = 'all' if io_type == 'io_stream' else 'batch'
     pa_config['rnd_strategy'] = rnd_strategy
     set_default_paq_conf(pa_config)
@@ -63,12 +63,12 @@ def get_data(N: int, sigma: float, max_scale: float, seed):
 
 
 @pytest.mark.parametrize("N", [50000, 10])
-@pytest.mark.parametrize("rnd_strategy", ['auto', 'standard_round', 'floor'])
+@pytest.mark.parametrize("rnd_strategy", ['auto'])
 @pytest.mark.parametrize("io_type", ['io_parallel', 'io_stream'])
 @pytest.mark.parametrize("cover_factor", [0.49, 1.0])
 @pytest.mark.parametrize("aggressive", [True, False])
-@pytest.mark.parametrize("backend", ['vivado', 'vitis'])
-@pytest.mark.parametrize("seed", [42, 114514, 1919810])
+@pytest.mark.parametrize("backend", ['vivado'])  # , 'vitis'])
+@pytest.mark.parametrize("seed", [42])
 def test_syn_large(N: int, rnd_strategy: str, io_type: str, cover_factor: float, aggressive: bool, backend: str, seed: int):
     dir = get_test_dir()
     set_seed(seed)

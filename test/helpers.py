@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-tf.config.experimental_run_functions_eagerly(True)
+tf.config.experimental_run_functions_eagerly(True)  # noqa
 tf.config.threading.set_inter_op_parallelism_threads(1)  # noqa
 tf.config.threading.set_intra_op_parallelism_threads(1)  # noqa
 
@@ -109,7 +109,22 @@ def _run_model_proxy_match_test(model: keras.Model, proxy: keras.Model, data, co
             warn(f"Keras-Proxy perfect match when overflow should happen: cover_factor={cover_factor}.")
 
 
-def run_model_test(model: keras.Model, cover_factor: float | None, data, io_type: str, backend: str, dir: str, aggressive: bool, no_exact_match: bool = False, skip_sl_test=False):
+def _run_gradient_test(model, data):
+    with tf.GradientTape() as tape:
+        out = model(data, training=True)
+        if isinstance(out, list):
+            loss = tf.reduce_mean([tf.reduce_sum(tf.abs(x)) for x in out])
+        else:
+            loss = tf.reduce_sum(tf.abs(out))
+
+    trainable_weights = model.trainable_weights
+    grad = tape.gradient(loss, trainable_weights)
+
+    for w, g in zip(trainable_weights, grad):
+        assert tf.reduce_any(g != 0), f"Gradient for {w.name} is zero"
+
+
+def run_model_test(model: keras.Model, cover_factor: float | None, data, io_type: str, backend: str, dir: str, aggressive: bool, no_exact_match: bool = False, skip_sl_test=False, test_gard=False):
     data_len = data.shape[0] if isinstance(data, np.ndarray) else data[0].shape[0]
     if cover_factor is not None:
         trace_minmax(model, data, cover_factor=cover_factor, bsz=data_len)
@@ -117,6 +132,8 @@ def run_model_test(model: keras.Model, cover_factor: float | None, data, io_type
     try:
         if not skip_sl_test:
             _run_model_sl_test(model, proxy, data, dir)
+        if test_gard:
+            _run_gradient_test(model, data)
         _run_model_proxy_match_test(model, proxy, data, cover_factor)
         _run_synth_match_test(proxy, data, io_type, backend, dir)
     except AssertionError as e:
