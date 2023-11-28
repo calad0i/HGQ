@@ -5,7 +5,7 @@ import tensorflow as tf
 from keras.activations import linear, relu
 
 from ..quantizer import HGQ
-from ..utils import apf_to_tuple, get_default_kq_conf, get_default_paq_config, tuple_to_apf, warn
+from ..utils import apf_to_tuple, get_default_kq_conf, get_default_paq_conf, tuple_to_apf, warn
 
 
 @staticmethod  # type: ignore
@@ -40,7 +40,7 @@ class HLayerBase(ABSBaseLayer):
         self._has_bias = None
         self.kq_config = kq_conf or get_default_kq_conf()
         "kernel quantizer config"
-        self.paq_config = paq_conf or get_default_paq_config()
+        self.paq_config = paq_conf or get_default_paq_conf()
         "pre-activation quantizer config"
         self.beta = tf.constant(beta, dtype=tf.float32, name='beta')
         "BOPs-regularization strength"

@@ -38,4 +38,4 @@ with shutup:
     from .layers import HConv1D, HConv1DBatchNorm, HConv2D, HConv2DBatchNorm, HDense, HDenseBatchNorm, HQuantize, PAvgPool1D, PAvgPool2D, PConcatenate, PFlatten, PMaxPool1D, PMaxPool2D, PReshape, Signature
     from .proxy import to_proxy_model
     from .quantizer import HGQ
-    from .utils import get_default_kq_conf, get_default_paq_config, set_default_kq_conf, set_default_paq_conf
+    from .utils import get_default_kq_conf, get_default_paq_conf, set_default_kq_conf, set_default_paq_conf

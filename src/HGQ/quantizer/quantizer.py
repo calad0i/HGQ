@@ -150,7 +150,11 @@ class HGQ:
         else:
             scale = tf.pow(two, self.fbw)
 
-        xq = q_round(x * scale, self.rnd_strategy) / scale  # type: ignore
+        rnd_strategy = self.rnd_strategy
+        if not training and rnd_strategy != 3:  # not std round or floor
+            rnd_strategy = 0
+        xq = q_round(x * scale, rnd_strategy) / scale  # type: ignore
+
         delta = tf.stop_gradient(xq - x)
         if training:
             prod = delta * self.fbw * log2  # type: ignore
@@ -187,7 +191,11 @@ class HGQ:
         else:
             scale = tf.pow(two, fbw)
 
-        xq = q_round(x * scale, self.rnd_strategy) / scale  # type: ignore
+        rnd_strategy = self.rnd_strategy
+        if not training and rnd_strategy != 3:  # not std round or floor
+            rnd_strategy = 0
+        xq = q_round(x * scale, rnd_strategy) / scale  # type: ignore
+
         delta = tf.stop_gradient(xq - x)
 
         if training:

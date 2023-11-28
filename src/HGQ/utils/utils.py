@@ -48,7 +48,7 @@ class L1L2:
         return tf.reduce_sum(x) * self.l1 + tf.reduce_sum(tf.square(x - self.l2_zero)) * self.l2
 
     def __name__(self):
-        return f'L1'
+        return f'L1L2'
 
     def get_config(self):
         return {'l1': self.l1, 'l2': self.l2, 'l2_zero': self.l2_zero}
@@ -83,7 +83,7 @@ def get_default_kq_conf():
     return DEFAULT_KERNEL_QUANTIZER_CONFIG.copy()
 
 
-def get_default_paq_config():
+def get_default_paq_conf():
     return DEFAULT_PRE_ACTIVATION_QUANTIZER_CONFIG.copy()
 
 
