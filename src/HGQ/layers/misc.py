@@ -70,9 +70,7 @@ class HAdd(HLayerBase, _Merge):
 
     @tf.function(jit_compile=True)
     def forward(self, inputs, training=None, record_minmax=None):
-        output = inputs[0]
-        for i in range(1, len(inputs)):
-            output += inputs[i]
+        output = tf.reduce_sum(inputs, axis=0)
         return self.paq(output, training=training, record_minmax=record_minmax)  # type: ignore
 
     def compute_output_shape(self, input_shape):
