@@ -94,5 +94,5 @@ Though the proxy model is bit-accurate with hls4ml in general, exceptions exist:
 ```
 
 ```{tip}
-The proxy model can also be used to convert a `QKeras` model to a bit-accurate hls4ml-ready proxy model. See more details in the [QKeras User?](qkeras.md) section.
+The proxy model can also be used to convert a `QKeras` model to a bit-accurate hls4ml-ready proxy model. See more details in the [Regarding QKeras](qkeras.md) section.
 ```
