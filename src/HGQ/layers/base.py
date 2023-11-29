@@ -219,7 +219,7 @@ class HLayerBase(ABSBaseLayer):
         mask = tf.reduce_max(self.act_bw, axis=dims, keepdims=False) > 0
 
         if self.paq.rnd_strategy != 3 and self.can_bias_cover_rnd:
-            bias = tf.pow(2., -tf.floor(fbw + 0.5) - 1) + bias  # type: ignore
+            bias = tf.pow(2., -tf.round(fbw) - 1) + bias  # type: ignore
 
         return tf.where(mask, bias, 0.)
 
