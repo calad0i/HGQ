@@ -41,6 +41,8 @@ def solve_dependencies(model: keras.Model):
         if node.is_input:
             continue
         layer = node.layer
+        if layer not in model.layers:
+            continue
         requires = list(node.parent_nodes)
         provides = node
         dependencies_list.append((layer, requires, provides))

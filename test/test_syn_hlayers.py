@@ -26,7 +26,13 @@ def create_model(layer: str, rnd_strategy: str, io_type: str):
         _inp = HQuantize()(inp)
     else:
         raise Exception(f'Please add test for {layer}')
-    out = eval('HGQ.layers.' + layer)(_inp)
+
+    _layer = eval('HGQ.layers.' + layer)
+    if hasattr(_layer, 'bias') and _layer.bias is not None:
+        bias: tf.Variable = _layer.bias
+        bias.assign(tf.constant(np.random.uniform(-4, 4, _layer.bias.shape).astype(np.float32)))
+
+    out = _layer(_inp)
     model = keras.Model(inp, out)
 
     for layer in model.layers:

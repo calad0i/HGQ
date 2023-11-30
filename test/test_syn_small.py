@@ -39,6 +39,9 @@ def create_model(rnd_strategy: str, io_type: str):
         if hasattr(layer, 'paq'):
             fbw: tf.Variable = layer.paq.fbw
             fbw.assign(tf.constant(np.random.uniform(2, 6, fbw.shape).astype(np.float32)))
+        if hasattr(layer, 'bias') and layer.bias is not None:
+            bias: tf.Variable = layer.bias
+            bias.assign(tf.constant(np.random.uniform(-4, 4, layer.bias.shape).astype(np.float32)))
     return model
 
 
