@@ -1,9 +1,10 @@
+from collections.abc import Callable
 from functools import singledispatchmethod
 
 import numpy as np
 import tensorflow as tf
 
-from ..utils import L1, L1L2, L2, strategy_dict
+from ..utils import strategy_dict
 
 two = tf.constant(2, dtype=tf.float32)
 log2 = tf.constant(np.log(2), dtype=tf.float32)
@@ -54,7 +55,7 @@ def get_arr_bits(arr: np.ndarray):
 class HGQ:
     """Heterogenous quantizer."""
 
-    def __init__(self, init_bw: float, skip_dims, rnd_strategy: str | int = 'floor', exact_q_value=True, dtype=None, bw_clip=(-23, 23), trainable=True, regularizer=None, minmax_record=False):
+    def __init__(self, init_bw: float, skip_dims, rnd_strategy: str | int = 'floor', exact_q_value=True, dtype=None, bw_clip=(-23, 23), trainable=True, regularizer: Callable | None = None, minmax_record=False):
         self.init_bw = init_bw
         self.skip_dims = skip_dims
         """tuple: Dimensions to use uniform quantizer. If None, use full heterogenous quantizer."""

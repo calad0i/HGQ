@@ -1,11 +1,12 @@
 import re
-import sys
 from warnings import warn as _warn
 
+import keras
 import tensorflow as tf
 
 
-class L1:
+@keras.utils.register_keras_serializable(package='HGQ')
+class MonoL1:
     def __init__(self, l1=0.):
         assert l1 >= 0, f'l1 must be non-negative, got {l1}'
         self.l1 = l1
@@ -17,34 +18,6 @@ class L1:
         return {'l1': self.l1}
 
 
-class L2:
-    def __init__(self, l2=0., zero=-16.):
-        assert l2 >= 0, f'l2 must be non-negative, got {l2}'
-        self.l2 = l2
-        self.zero = zero
-
-    def __call__(self, x):
-        return tf.reduce_sum(tf.square(x - self.zero)) * self.l2
-
-    def get_config(self):
-        return {'l2': self.l2, 'zero': self.zero}
-
-
-class L1L2:
-    def __init__(self, l1=0., l2=0., l2_zero=-16.):
-        assert l1 >= 0, f'l1 must be non-negative, got {l1}'
-        assert l2 >= 0, f'l2 must be non-negative, got {l2}'
-        self.l1 = l1
-        self.l2 = l2
-        self.l2_zero = l2_zero
-
-    def __call__(self, x):
-        return tf.reduce_sum(x) * self.l1 + tf.reduce_sum(tf.square(x - self.l2_zero)) * self.l2
-
-    def get_config(self):
-        return {'l1': self.l1, 'l2': self.l2, 'l2_zero': self.l2_zero}
-
-
 DEFAULT_KERNEL_QUANTIZER_CONFIG = \
     dict(init_bw=2,
          skip_dims=None,
@@ -53,7 +26,7 @@ DEFAULT_KERNEL_QUANTIZER_CONFIG = \
          dtype=None,
          bw_clip=(-23, 23),
          trainable=True,
-         regularizer=L1(1e-6),
+         regularizer=MonoL1(1e-6),
          )
 
 
@@ -65,7 +38,7 @@ DEFAULT_PRE_ACTIVATION_QUANTIZER_CONFIG = \
          dtype=None,
          bw_clip=(-23, 23),
          trainable=True,
-         regularizer=L1(1e-6),
+         regularizer=MonoL1(1e-6),
          minmax_record=True
          )
 
