@@ -7,6 +7,8 @@ except ImportError:
     __version__ = "unknown version"
     version_tuple = (0, 0, "unknown version")
 
+from . import _patch
+
 
 class Shutup:
     def write(self, s):
