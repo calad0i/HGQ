@@ -9,7 +9,7 @@ version = "0.2.0b2"
 authors = [{ name = "Chang Sun", email = "chsun@cern.ch" }]
 description = "High Granularity Quantizarion"
 readme = "README.md"
-requires-python = ">=3.10,<3.12"
+requires-python = ">=3.10"
 license = { file = "LICENSE" }
 
 classifiers = [
@@ -19,7 +19,7 @@ classifiers = [
   "Development Status :: 4 - Beta",
 ]
 
-dependencies = ['tensorflow==2.13', 'numpy>=1.23']
+dependencies = ['tensorflow~=2.13', 'numpy>=1.23']
 
 [project.urls]
 repository = "https://github.com/calad0i/HGQ"
@@ -37,5 +37,6 @@ test = [
   "pytest-xdist",
   "pytest-env",
   "pytest-cov",
+  "pytest-sugar",
   "pyparsing",
 ]
