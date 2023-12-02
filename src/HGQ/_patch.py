@@ -2,7 +2,6 @@ def patch_singledispatch():
     "Patch functools.singledispatch to support Union types. Invoked only for python<=3.10"
     import sys
     if sys.version_info >= (3, 11):
-        print("singledispatch patch not needed for python>=3.11")
         return
     import functools
     from functools import singledispatch as _singledispatch
