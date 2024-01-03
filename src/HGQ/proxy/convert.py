@@ -16,11 +16,14 @@ from .precision_derivation import register_qconf
 def get_all_nodes(model: keras.Model) -> set[Node]:
     """Get all nodes in the model as a set."""
     nodes = set()
+    layers = set(model.layers)
     for layer in model.layers:
         for node in layer._inbound_nodes:
-            nodes.add(node)
+            if node.layer in layers:
+                nodes.add(node)
         for node in layer._outbound_nodes:
-            nodes.add(node)
+            if node.layer in layers:
+                nodes.add(node)
     return nodes
 
 
@@ -40,9 +43,7 @@ def solve_dependencies(model: keras.Model):
     for node in nodes:
         if node.is_input:
             continue
-        layer = node.layer
-        if layer not in model.layers:
-            continue
+        layer = node.layer  # layer that is called on the node
         requires = list(node.parent_nodes)
         provides = node
         dependencies_list.append((layer, requires, provides))
@@ -261,7 +262,6 @@ def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_off
     if accum_fp_max_offset is not None and accum_fp_max_offset < 0:
         warn('You are using a negative value for bias_accum_bits. Please make sure you know what you are doing.')
 
-    nof_output = len(output_nodes)
     inputs = [keras.layers.Input(shape=node.input_shapes[0][1:]) for node in input_nodes]
     satisfied = {node: tensor for node, tensor in zip(input_nodes, inputs)}
     outputs = []
@@ -271,7 +271,7 @@ def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_off
         SAT = 'WRAP'
     else:
         SAT = 'SAT'
-    while dependencies_list and not len(outputs) == nof_output:
+    while dependencies_list:
         layer, requires, provides = dependencies_list.pop(0)
         if set(requires).issubset(satisfied):
             inps = [satisfied[node] for node in requires]
