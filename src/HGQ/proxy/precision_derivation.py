@@ -102,10 +102,13 @@ def _(layer: FixedPointQuantizer):
 
 
 @get_produced_kif.register
-def _(layer: keras.layers.Activation):
+def _(layer: keras.layers.Activation | keras.layers.ReLU | keras.layers.LeakyReLU | keras.layers.Softmax):
     kifs = get_input_kifs(layer)
     assert len(kifs) == 1, f'Activation layer {layer.name} has more than one input. This is not supported.'
-    if layer.activation is tf.keras.activations.softmax:
+    if isinstance(layer, keras.layers.Activation):
+        if layer.activation is tf.keras.activations.softmax:
+            return 0, 1, 65535
+    if isinstance(layer, keras.layers.Softmax):
         return 0, 1, 65535
     k, i, f = activation_kif_forward(layer, *np.max(kifs, axis=0))
     return k, i, f
