@@ -68,13 +68,13 @@ def trace_minmax(model, dataset, bsz=16384, verbose=True, return_predictions=Fal
 
             aq = layer.paq
             _min, _max = aq._min.numpy(), aq._max.numpy()  # type: ignore
-            cover_factor_min = np.full_like(_min, cover_factor)
-            cover_factor_min[_min > 0] = 1. / cover_factor
-            cover_factor_max = np.full_like(_max, cover_factor)
-            cover_factor_max[_max < 0] = 1. / cover_factor
+            mean = (_min + _max) / 2
+            diff = (_max - _min) / 2
+            _min = mean - diff * cover_factor
+            _max = mean + diff * cover_factor
 
-            aq._min.assign(aq(aq._min * cover_factor_min))  # type: ignore
-            aq._max.assign(aq(aq._max * cover_factor_max))  # type: ignore
+            aq._min.assign(aq(tf.constant(_min)))  # type: ignore
+            aq._max.assign(aq(tf.constant(_max)))  # type: ignore
 
     for layer in model.layers:
         if not hasattr(layer, 'activation'):
