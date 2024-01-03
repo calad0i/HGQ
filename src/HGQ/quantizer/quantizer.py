@@ -245,6 +245,7 @@ class HGQ:
         """
 
         if ref is None and self.minmax_record:
+            assert tf.reduce_all(self._min <= self._max), "Some min values are larger than max values. Did you forget to run trace_minmax?"  # type: ignore
             fp_bits = tf.round(self.fbw).numpy()  # type: ignore
             with np.errstate(divide='ignore'):
                 if pos_only:
