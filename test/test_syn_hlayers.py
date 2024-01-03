@@ -79,7 +79,6 @@ def softmax_cond(proxy, hls):
                           "HAdd()",
                           "HActivation('relu')",
                           #   "HActivation('leaky_relu')",
-                          "HActivation('relu6')",
                           "HActivation('tanh')",
                           "HActivation('sigmoid')",
                           "HActivation('softmax')",
