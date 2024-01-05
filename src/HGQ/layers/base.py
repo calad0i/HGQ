@@ -43,7 +43,7 @@ class HLayerBase(ABSBaseLayer):
         "kernel quantizer config"
         self.paq_config = paq_conf or get_default_paq_conf()
         "pre-activation quantizer config"
-        self.beta = tf.Variable(beta, dtype=tf.float32, name='beta')
+        self.beta = tf.Variable(beta, dtype=tf.float32, name='beta', trainable=False)
         "BOPs-regularization strength"
         self.record_minmax = False
         self._has_last_layer = False
