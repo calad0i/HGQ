@@ -12,7 +12,7 @@ from tensorflow import keras
 from HGQ.proxy.fixed_point_quantizer import FixedPointQuantizer
 from HGQ.utils import warn
 
-from ..convert import to_proxy_layers
+from ..convert import ProxyLayerXFormer
 from ..precision_derivation import get_produced_kif
 
 qkeras_objects = {}
@@ -36,6 +36,11 @@ from functools import singledispatch
 
 @singledispatch
 def qkeras_quantizer_to_layers(quantizer, SAT) -> tuple[keras.layers.Layer, ...]:
+    """
+    Map qkeras quantizer to a tuple of equivalent proxy layers.
+        e.g.: quantized_bits -> (fixed,)
+              quantized_relu -> (fixed, relu, fixed)
+    """
     raise TypeError(f"Unknown quantizer type {type(quantizer)}")
 
 
@@ -87,7 +92,7 @@ def _(quantizer: quantizers.quantized_po2 | quantizers.quantized_relu_po2):
     raise ValueError("quantized_po2 family cannot be implemented in hls4ml as activation.")
 
 
-def qlayer_to_keras_layer(layer: keras.layers.Layer, name) -> keras.layers.Layer | None:
+def qlayer_to_keras_layer(layer: keras.layers.Layer) -> keras.layers.Layer | None:
     base_cls_name = layer.__class__.__name__[1:]
     if not hasattr(keras.layers, base_cls_name):
         raise ValueError(f"Cannot find corresponding keras layer for {layer.__class__.__name__}")
@@ -108,7 +113,6 @@ def qlayer_to_keras_layer(layer: keras.layers.Layer, name) -> keras.layers.Layer
                 del conf[k]
                 continue
 
-    conf['name'] = name
     klayer = base_cls(**conf)
     klayer.trainable = False
     klayer.build(layer.input_shape)
@@ -121,18 +125,29 @@ def qlayer_to_keras_layer(layer: keras.layers.Layer, name) -> keras.layers.Layer
     return klayer
 
 
-def qlayer_to_proxy_layers(layer: keras.layers.Layer, name: str, SAT: str) -> tuple[keras.layers.Layer, ...]:
-    klayer = qlayer_to_keras_layer(layer, name)
+def qlayer_to_proxy_layer(self: ProxyLayerXFormer, layer: keras.layers.Layer) -> tuple[keras.layers.Layer, ...]:
+
+    SAT = self.SAT
+    klayer = qlayer_to_keras_layer(layer)
     if not hasattr(layer, 'activation'):
         assert klayer is not None
-        return klayer,
+        return klayer
 
     activation = layer.quantizer if hasattr(layer, 'quantizer') else layer.activation
     act_layers = qkeras_quantizer_to_layers(activation, SAT)
-    if klayer is not None:
-        return klayer, *act_layers
+
+    input_shape = layer.input_shape
+    if isinstance(input_shape, tuple):
+        inputs = keras.layers.Input(shape=input_shape[1:])
     else:
-        return *act_layers,
+        inputs = [keras.layers.Input(shape=shape[1:]) for shape in input_shape]
+
+    out = inputs
+    if klayer is not None:
+        out = klayer(out)
+    for layer in act_layers:
+        out = layer(out)
+    return keras.Model(inputs, out)
 
 
 class QKerasBaseLayer(metaclass=abc.ABCMeta):
@@ -144,5 +159,5 @@ for layer_cls in qkeras_layers:
 
 
 def init():
-    to_proxy_layers.register(QKerasBaseLayer, qlayer_to_proxy_layers)
+    ProxyLayerXFormer.__call__.register(QKerasBaseLayer, qlayer_to_proxy_layer)
     get_produced_kif.register(qkeras.QActivation, get_produced_kif.registry[keras.layers.Activation])

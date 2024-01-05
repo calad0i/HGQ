@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "HGQ"
-version = "0.2.0rc1"
+version = "0.2.0rc2"
 authors = [{ name = "Chang Sun", email = "chsun@cern.ch" }]
 description = "High Granularity Quantizarion"
 readme = "README.md"
@@ -19,7 +19,7 @@ classifiers = [
   "Development Status :: 4 - Beta",
 ]
 
-dependencies = ['tensorflow~=2.13', 'numpy>=1.23']
+dependencies = ['tensorflow==2.13.*', 'numpy>=1.23']
 
 [project.urls]
 repository = "https://github.com/calad0i/HGQ"

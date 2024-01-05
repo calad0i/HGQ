@@ -81,6 +81,10 @@ class HLayerBase(ABSBaseLayer):
             return np.prod(quantizer_shape[1:]) == 1 and bias_shape == quantizer_shape[0:1]
         return False
 
+    @property
+    def _relu_act(self):
+        return hasattr(self, 'activation') and self.activation is tf.keras.activations.relu
+
     def post_build(self, input_shape):
         """This method should be called after calling build() method of the child class. It initializes the quantizers and sets the bops variable, and set a few flags (_has_kernel, _has_bias, _relu_act) for convenience.)"""
         self._has_kernel = False
@@ -89,7 +93,6 @@ class HLayerBase(ABSBaseLayer):
             self._has_kernel = True
         if hasattr(self, 'bias') and self.bias is not None:
             self._has_bias = True
-        self._relu_act = hasattr(self, 'activation') and self.activation is tf.keras.activations.relu
 
         self.init_quantizers(input_shape)
         if not hasattr(self, 'channel_loc'):
@@ -169,7 +172,7 @@ class HLayerBase(ABSBaseLayer):
     @property
     def kernel_bw_exact(self):
         """Returns exact bitwidth of the kernel. Non-differentiable. For post-training use."""
-        int_bits, fb, kn = self.kq.get_bits_exact(self.fused_kernel)
+        kn, int_bits, fb = self.kq.get_bits_exact(self.fused_kernel)
         return int_bits + fb  # sign not considered for kernel
 
     @property

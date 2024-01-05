@@ -256,12 +256,12 @@ class HGQ:
                     int_bits = np.floor(np.log2(np.maximum(np.abs(self._max), np.abs(self._min)))) + 1  # type:ignore
                     kn = (self._min.numpy() < 0)  # type:ignore
             int_bits = np.clip(int_bits, -fp_bits - kn, 32)
-            return int_bits.astype(np.int8), fp_bits.astype(np.int8), kn.astype(np.int8)
+            return kn.astype(np.int8), int_bits.astype(np.int8), fp_bits.astype(np.int8)
 
         assert ref is not None
         w = self.forward(ref).numpy()  # type: ignore
         k, i, f = get_arr_bits(w)
-        return i, f, k
+        return k, i, f
 
     def adapt_bw_bits(self, ref: tf.Tensor):
         """Adapt the bitwidth of the quantizer to the input tensor, such that each input is represented with approximately the same number of bits. (i.e., 1.5 with be represented by ap_fixed<2,1> and 0.375 will be represented by ap_fixed<2,-2>)."""
