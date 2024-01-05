@@ -43,7 +43,7 @@ class HLayerBase(ABSBaseLayer):
         "kernel quantizer config"
         self.paq_config = paq_conf or get_default_paq_conf()
         "pre-activation quantizer config"
-        self.beta = tf.constant(beta, dtype=tf.float32, name='beta')
+        self.beta = tf.Variable(beta, dtype=tf.float32, name='beta')
         "BOPs-regularization strength"
         self.record_minmax = False
         self._has_last_layer = False
@@ -205,9 +205,6 @@ class HLayerBase(ABSBaseLayer):
     def fused_qbias(self):
         """Returns the final, quantized bias for deployment. non-differentiable, should not be used for training. When using rounding to nearest and the bias can cover the rounding error, bias is pre-biased to cover the rounding shift 2^-fbw, and then TRN can be used instead RND without any loss of accuracy."""
         bias = self.paq.bias_forward(self.fused_bias, False, self.channel_loc)  # type: ignore
-
-        if bias is None:
-            return None
 
         fbw = self.paq.fbw
         if self.channel_loc == -1:
