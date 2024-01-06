@@ -145,8 +145,6 @@ def apply_layer(
       - if the layer is a model, apply the model recursively in a flattened manner.
       - if the layer is a keras layer, transform it by layer_transformer, until the exactly same reference is returned.
     """
-    if layer is None:
-        return inp_tensors[0] if len(inp_tensors) == 1 else inp_tensors
 
     layer_xf = layer_xformer(layer)
     n = 0
@@ -154,7 +152,7 @@ def apply_layer(
         if isinstance(layer_xf, keras.Model):
             # layer_transformer may return a keras.Model from a layer.
             return apply_layer(layer_xf, inp_tensors, namer=namer, layer_xformer=layer_xformer)
-        assert n < 1024, f'layer_transformer does not converge for layer {layer.name}.'
+        assert n < 1024, f'layer_transformer does not converge for layer (name: {layer.name if layer is not None else None}).'
         layer = layer_xf
         layer_xf = layer_xformer(layer)
         n += 1
