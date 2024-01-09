@@ -385,6 +385,8 @@ def get_whatever_quantizer(layer: keras.layers.Layer):
 
 def register_qconf(layer: keras.layers.Layer, accum_fp_max_offset: None | int = None):
     """Get and register quantization configuration for a layer in the proxy model."""
+    if hasattr(layer, 'proxy_ready'):
+        return
     q = get_whatever_quantizer(layer)
     conf = get_config(layer, accum_fp_max_offset=accum_fp_max_offset)
     overrides = q.overrides or {}

@@ -16,7 +16,7 @@ from hls4ml.converters import convert_from_keras_model
 from tensorflow import keras
 
 from HGQ import trace_minmax
-from HGQ.proxy import FixedPointQuantizer, to_proxy_model
+from HGQ.proxy import FixedPointQuantizer, UnaryLUT, to_proxy_model
 
 tf.get_logger().setLevel('ERROR')
 
@@ -76,8 +76,7 @@ def _run_model_sl_test(model: keras.Model, proxy: keras.Model, data, output_dir:
     model_loaded: keras.Model = keras.models.load_model(output_dir + '/keras.h5')  # type: ignore
 
     proxy.save(output_dir + '/proxy.h5')
-    proxy_loaded: keras.Model = keras.models.load_model(output_dir + '/proxy.h5', custom_objects={'FixedPointQuantizer': FixedPointQuantizer})  # type: ignore
-
+    proxy_loaded: keras.Model = keras.models.load_model(output_dir + '/proxy.h5', custom_objects={'FixedPointQuantizer': FixedPointQuantizer, 'UnaryLUT': UnaryLUT})  # type: ignore
     for l1, l2 in zip(proxy.layers, proxy_loaded.layers):
         if not isinstance(l1, FixedPointQuantizer):
             continue
@@ -133,7 +132,7 @@ def run_model_test(model: keras.Model, cover_factor: float | None, data, io_type
         _run_gradient_test(model, data)
     if cover_factor is not None:
         trace_minmax(model, data, cover_factor=cover_factor, bsz=data_len)
-    proxy = to_proxy_model(model, aggressive=aggressive)
+    proxy = to_proxy_model(model, aggressive=aggressive, uniary_lut_max_table_size=1024)
     try:
         if not skip_sl_test:
             _run_model_sl_test(model, proxy, data, dir)

@@ -14,6 +14,7 @@ from ..layers.base import ABSBaseLayer
 from ..utils import warn
 from .fixed_point_quantizer import FixedPointQuantizer
 from .precision_derivation import register_qconf
+from .unary_lut import xfr_to_unary_lut
 
 
 def get_all_nodes(model: keras.Model) -> set[Node]:
@@ -218,7 +219,7 @@ def to_keras_layer(layer):
 
 
 @to_keras_layer.register
-def _(layer: HLayerBase | PLayerBase):
+def _(layer: ABSBaseLayer):
     """Given a HGQ layer, return the corresponding keras layer.
 
     Example:
@@ -237,6 +238,9 @@ def _(layer: HLayerBase | PLayerBase):
         if 'activation' in conf and conf['activation'] != 'linear':
             # Activation will be processed separately for non-activation layers.
             conf['activation'] = 'linear'
+    else:
+        # Prevent custom activation crashing conversion.
+        conf['activation'] = layer.activation
 
     cls_name = layer.__class__.__name__[1:]
     if hasattr(keras.layers, cls_name):
@@ -336,7 +340,7 @@ class ProxyLayerXFormer:
         return layer
 
 
-def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_offset: int | None = None):
+def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_offset: int | None = None, uniary_lut_max_table_size=-1):
     """Given a HGQ model, return a hls4ml-ready keras model.
 
     Args:
@@ -353,6 +357,8 @@ def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_off
     if accum_fp_max_offset is not None and accum_fp_max_offset < 0:
         warn('You are using a negative value for bias_accum_bits. Please make sure you know what you are doing.')
     proxy = convert_model(model, layer_xformer=ProxyLayerXFormer('WRAP' if aggressive else 'SAT').__call__)
+    if uniary_lut_max_table_size > 0:
+        proxy = convert_model(proxy, layer_xformer=partial(xfr_to_unary_lut, max_table_size=uniary_lut_max_table_size))
     for layer in proxy.layers:
         register_qconf(layer, accum_fp_max_offset=accum_fp_max_offset)
     return proxy
