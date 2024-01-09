@@ -132,7 +132,7 @@ def run_model_test(model: keras.Model, cover_factor: float | None, data, io_type
         _run_gradient_test(model, data)
     if cover_factor is not None:
         trace_minmax(model, data, cover_factor=cover_factor, bsz=data_len)
-    proxy = to_proxy_model(model, aggressive=aggressive, uniary_lut_max_table_size=1024)
+    proxy = to_proxy_model(model, aggressive=aggressive, unary_lut_max_table_size=4096)
     try:
         if not skip_sl_test:
             _run_model_sl_test(model, proxy, data, dir)

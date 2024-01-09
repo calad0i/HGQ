@@ -60,6 +60,10 @@ def softmax_cond(proxy, hls):
     assert match_precent > 0.90, f"Keras-Proxy mismatch: {(1-match_precent) * 100}% of samples are different. Sample: {proxy[:5]} vs {hls[:5]}"
 
 
+def custom_fn(x):
+    return tf.sin(x)**2. - x  # type: ignore
+
+
 @pytest.mark.parametrize('layer',
                          ["HDense(10)",
                           "HDense(10, use_bias=False)",
@@ -82,6 +86,7 @@ def softmax_cond(proxy, hls):
                           "HActivation('tanh')",
                           "HActivation('sigmoid')",
                           "HActivation('softmax')",
+                          "HActivation(custom_fn)",
                           ]
                          )
 @pytest.mark.parametrize("N", [1000])
@@ -99,6 +104,8 @@ def test_syn_hlayers(layer, N: int, rnd_strategy: str, io_type: str, cover_facto
 
     test_grad = N > 100
     cond = None if 'softmax' not in layer else softmax_cond
+
+    skip_sl_test = 'custom' in layer
     run_model_test(model,
                    cover_factor, data,
                    io_type,
@@ -106,7 +113,8 @@ def test_syn_hlayers(layer, N: int, rnd_strategy: str, io_type: str, cover_facto
                    dir,
                    aggressive,
                    test_gard=test_grad,
-                   cond=cond
+                   cond=cond,
+                   skip_sl_test=skip_sl_test,
                    )
 
 

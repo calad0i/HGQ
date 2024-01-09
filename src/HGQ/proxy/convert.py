@@ -340,7 +340,7 @@ class ProxyLayerXFormer:
         return layer
 
 
-def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_offset: int | None = None, uniary_lut_max_table_size=-1):
+def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_offset: int | None = None, unary_lut_max_table_size=-1):
     """Given a HGQ model, return a hls4ml-ready keras model.
 
     Args:
@@ -357,8 +357,8 @@ def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_off
     if accum_fp_max_offset is not None and accum_fp_max_offset < 0:
         warn('You are using a negative value for bias_accum_bits. Please make sure you know what you are doing.')
     proxy = convert_model(model, layer_xformer=ProxyLayerXFormer('WRAP' if aggressive else 'SAT').__call__)
-    if uniary_lut_max_table_size > 0:
-        proxy = convert_model(proxy, layer_xformer=partial(xfr_to_unary_lut, max_table_size=uniary_lut_max_table_size))
+    if unary_lut_max_table_size > 0:
+        proxy = convert_model(proxy, layer_xformer=partial(xfr_to_unary_lut, max_table_size=unary_lut_max_table_size))
     for layer in proxy.layers:
         register_qconf(layer, accum_fp_max_offset=accum_fp_max_offset)
     return proxy
