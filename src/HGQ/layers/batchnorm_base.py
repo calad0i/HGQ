@@ -2,6 +2,7 @@ import tensorflow as tf
 from keras.src.utils import tf_utils
 from tensorflow import keras
 
+from ..utils import warn
 from .base import HLayerBase
 
 
@@ -23,6 +24,10 @@ class HBatchNormBase(HLayerBase):
         gamma_constraint=None,
         **kwargs,
     ):
+        if center and not getattr(self, "use_bias", False):
+            warn(f'`center` in fused BatchNorm can only be used if `use_bias` is True. Setting center to False.')
+            center = False
+
         super().__init__(**kwargs)
         self.axis = [axis] if not isinstance(axis, (list, tuple)) else list(axis)
         self.momentum = tf.constant(momentum, dtype=self.dtype)
