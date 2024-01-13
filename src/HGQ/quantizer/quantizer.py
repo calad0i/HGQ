@@ -246,24 +246,27 @@ class HGQ:
 
         if ref is None and self.minmax_record:
             assert tf.reduce_all(self._min <= self._max), "Some min values are larger than max values. Did you forget to run trace_minmax?"  # type: ignore
-            fp_bits = tf.round(self.fbw).numpy()  # type: ignore
+            f = tf.round(self.fbw).numpy()  # type: ignore
             with np.errstate(divide='ignore'):
                 if pos_only:
                     _ref = np.maximum(self._max, 0.)  # type:ignore
-                    int_bits = np.floor(np.log2(_ref)) + 1
-                    kn = np.zeros_like(self._max)
+                    i = np.floor(np.log2(_ref)) + 1
+                    k = np.zeros_like(self._max)
                 else:
-                    int_bits1 = np.ceil(np.log2(np.abs(self._min)))  # type:ignore
-                    int_bits2 = np.ceil(np.log2(np.abs(self._max) + 2**-fp_bits))  # type:ignore
-                    int_bits = np.maximum(int_bits1, int_bits2)
-                    kn = (self._min.numpy() < 0)  # type:ignore
-            int_bits = np.clip(int_bits, -fp_bits - kn, 32)
-            return kn.astype(np.int8), int_bits.astype(np.int8), fp_bits.astype(np.int8)
+                    i_neg = np.ceil(np.log2(np.abs(self._min)))  # type:ignore
+                    i_pos = np.ceil(np.log2(np.abs(self._max) + 2**-f))  # type:ignore
+                    i = np.maximum(i_neg, i_pos)
+                    k = (self._min.numpy() < 0)  # type:ignore
+            i = np.clip(i, -f - k, 32)
+            k, i, f = k.astype(np.int8), i.astype(np.int8), f.astype(np.int8)
+            mask = k + i + f != 0
+            return k * mask, i * mask, f * mask
 
         assert ref is not None
         w = self.forward(ref).numpy()  # type: ignore
         k, i, f = get_arr_bits(w)
-        return k, i, f
+        mask = k + i + f != 0
+        return k * mask, i * mask, f * mask
 
     def adapt_bw_bits(self, ref: tf.Tensor):
         """Adapt the bitwidth of the quantizer to the input tensor, such that each input is represented with approximately the same number of bits. (i.e., 1.5 with be represented by ap_fixed<2,1> and 0.375 will be represented by ap_fixed<2,-2>)."""
