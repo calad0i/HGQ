@@ -146,7 +146,8 @@ def _(layer: keras.layers.Dense | Conv):
     assert len(kifs) == 1, f'Dense layer {layer.name} has more than one input. This is not supported.'
     k, i, f = kifs[0]
     w_k, w_i, w_f = get_arr_container(layer.kernel.numpy())
-    k, i, f = int(k or w_k), i + w_i, f + w_f
+    k = int(k or w_k or np.any(layer.bias < 0))  # type: ignore
+    i, f = i + w_i, f + w_f
     if isinstance(layer, Conv):
         div = layer.filters
     else:
