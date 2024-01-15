@@ -24,7 +24,7 @@ class UnaryLUT(Layer):
         self.kif_in = kif_in
         self.kif_out = kif_out
         k, i, f = kif_in
-        self.scale = 2 ** f
+        self.scale = 2. ** f
         self.table = None
         if (table := kwargs.pop('table', None)) is not None:
             k, i, f, = kif_out
