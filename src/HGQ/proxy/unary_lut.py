@@ -10,7 +10,7 @@ from HGQ.proxy.fixed_point_quantizer import gfixed_quantizer
 from HGQ.proxy.precision_derivation import get_input_kifs, get_produced_kif, get_result_kifRS
 from HGQ.utils import apf_to_tuple, tuple_to_apf
 
-LUT_SIZE_LIMITATION = int(os.environ.get('LUT_SIZE_LIMITATION', 2**20))
+LUT_SIZE_LIMITATION = int(os.environ.get('LUT_SIZE_LIMITATION', 2**12))
 
 
 class UnaryLUT(Layer):
