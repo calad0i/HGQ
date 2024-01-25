@@ -31,6 +31,14 @@ class ABSBaseLayer(tf.keras.layers.Layer):
         except AssertionError:
             return None
 
+    @property
+    def input_bw_exact(self):
+        assert len(self._inbound_nodes) <= 1, f"Layer {self.name} is reused {len(self._inbound_nodes)} times. This is not allowed."
+        try:
+            return self.last_layer.act_bw_exact.astype(np.float32)
+        except AssertionError:
+            return None
+
 
 class HLayerBase(ABSBaseLayer):
     """Abstract base class for all layers in the library. Child classes should call post_build() after calling their build() method.
@@ -185,6 +193,12 @@ class HLayerBase(ABSBaseLayer):
         bw = tf.nn.relu(bw)
         bw = scale_grad(bw, tf.sqrt(1. / self.paq.degeneracy))  # type: ignore
         return tf.broadcast_to(bw, (1,) + self.output_shape[1:])
+
+    @property
+    def act_bw_exact(self):
+        """Returns the exact bitwidth of the pre-activation values. Non-differentiable. For post-training use."""
+        kn, int_bits, fb = self.paq.get_bits_exact(pos_only=self._relu_act)
+        return int_bits + fb + kn
 
     @property
     def fused_bias(self):

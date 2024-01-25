@@ -51,7 +51,7 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
             kernel_bw = self._kernel_bw(kq)  # type: ignore
             bops = tf.reduce_sum(tf.matmul(input_bw, kernel_bw))
             self.bops.assign(bops)
-            bops = tf.cast(bops, tf.float32) * self.beta
+            bops = tf.cast(bops, tf.float32) * self.beta  # type: ignore
             self.add_loss(tf.convert_to_tensor(bops))
         return a
 
@@ -71,8 +71,8 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
     @property
     def compute_exact_bops(self):
         kernel_bw = self.kernel_bw_exact
-        input_bw = self.input_bw.numpy()  # type: ignore
-        bops = np.sum(np.matmul(input_bw, kernel_bw))
+        input_bw = self.input_bw_exact
+        bops = np.sum(np.matmul(input_bw, kernel_bw))  # type: ignore
         self.bops.assign(tf.constant(bops, dtype=tf.float32))
         return bops
 
@@ -156,7 +156,7 @@ class HDenseBatchNorm(HDense, HBatchNormBase):
             kernel_bw = self._kernel_bw(kq)  # type: ignore
             bops = tf.reduce_sum(tf.matmul(input_bw, kernel_bw))
             self.bops.assign(bops)
-            bops = tf.cast(bops, tf.float32) * self.beta
+            bops = tf.cast(bops, tf.float32) * self.beta  # type: ignore
             self.add_loss(tf.convert_to_tensor(bops))
         return a
 

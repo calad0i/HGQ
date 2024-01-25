@@ -129,7 +129,7 @@ class HConv(HLayerBase, Conv):
     @property
     def compute_exact_bops(self):
         kernel_bw = tf.constant(self.kernel_bw_exact, dtype=tf.float32)
-        input_bw = self.input_bw  # type: ignore
+        input_bw = self.input_bw_exact
         bops = int(tf.reduce_sum(self.convolution_op(input_bw, kernel_bw)).numpy()) * int(self.parallel_factor.numpy()) / int(self.total_channels.numpy())  # type: ignore
         self.bops.assign(tf.constant(bops, dtype=tf.float32))
         return bops
