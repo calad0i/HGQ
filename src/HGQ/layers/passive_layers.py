@@ -23,6 +23,12 @@ class PLayerBase(ABSBaseLayer):
         input_bw = tf.reshape(self.input_bw, shape)
         return tf.ensure_shape(input_bw, shape)
 
+    @property
+    def act_bw_exact(self) -> np.ndarray:
+        """Returns the bitwidth of the pre-activation values. Differentiable."""
+        shape = (1,) + self.output_shape[1:]
+        return self.input_bw_exact.reshape(shape)
+
 
 @register_keras_serializable(package="HGQ")
 class Signature(PLayerBase):
@@ -54,6 +60,10 @@ class Signature(PLayerBase):
     @tf.function(jit_compile=True)
     def act_bw(self):
         return tf.keras.backend.cast_to_floatx(self.bits)
+
+    @property
+    def act_bw_exact(self) -> np.ndarray:
+        return self.bits.numpy()  # type: ignore
 
     @property
     def input_bw(self):
