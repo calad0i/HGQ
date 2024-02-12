@@ -105,6 +105,10 @@ class PConcatenate(tf.keras.layers.Concatenate, PLayerBase):
         input_bws = [l.act_bw for l in self._inbound_nodes[0].inbound_layers]
         return tf.concat(input_bws, axis=self.axis)
 
+    @property
+    def act_bw_exact(self) -> np.ndarray:
+        return np.concatenate([l.act_bw_exact for l in self._inbound_nodes[0].inbound_layers], axis=self.axis)
+
 
 @register_keras_serializable(package="HGQ")
 class PPool2D(PLayerBase, Pooling2D):
@@ -118,6 +122,11 @@ class PPool2D(PLayerBase, Pooling2D):
         act_bw = super().input_bw
         return tf.nn.max_pool2d(act_bw, ksize=self.pool_size, strides=self.strides, padding=self.padding.upper(), data_format=self._tf_data_format)
 
+    @property
+    def act_bw_exact(self) -> np.ndarray:
+        act_bw = super().input_bw_exact
+        return tf.nn.max_pool2d(act_bw, ksize=self.pool_size, strides=self.strides, padding=self.padding.upper(), data_format=self._tf_data_format).numpy()
+
 
 @register_keras_serializable(package="HGQ")
 class PPool1D(PLayerBase, Pooling1D):
@@ -130,6 +139,11 @@ class PPool1D(PLayerBase, Pooling1D):
     def act_bw(self):
         act_bw = super().input_bw
         return tf.nn.max_pool1d(act_bw, ksize=self.pool_size, strides=self.strides, padding=self.padding.upper(), data_format=self._tf_data_format)
+
+    @property
+    def act_bw_exact(self) -> np.ndarray:
+        act_bw = super().input_bw_exact
+        return tf.nn.max_pool1d(act_bw, ksize=self.pool_size, strides=self.strides, padding=self.padding.upper(), data_format=self._tf_data_format).numpy()
 
 
 @register_keras_serializable(package="HGQ")
