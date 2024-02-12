@@ -49,6 +49,9 @@ def get_arr_bits(arr: np.ndarray):
         high_pos = np.where(arr[..., 0] != 0, np.floor(np.log2(arr[..., 0]) + 1), low_pos).astype(np.int8)
     fb = 32 - low_pos
     int_bits = high_pos - low_pos - fb
+    zero_mask = int_bits + fb == 0
+    int_bits[zero_mask] = 0
+    fb[zero_mask] = 0
     return kn.astype(np.int8), int_bits.astype(np.int8), fb.astype(np.int8)
 
 
