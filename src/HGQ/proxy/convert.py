@@ -157,10 +157,9 @@ def apply_layer(
         layer_xf = layer_xformer(layer)
         n += 1
 
-    name = namer.next_name(layer_xf.name)
-    layer_xf._name = name
-
     if layer_xf is not None:
+        name = namer.next_name(layer_xf.name)
+        layer_xf._name = name
         # Remove all inbound and outbound nodes to clean up the graph.
         layer_xf = copy(layer_xf)
         layer_xf._inbound_nodes = []
