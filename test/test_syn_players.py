@@ -16,28 +16,28 @@ def create_model(layer: str, rnd_strategy: str, io_type: str):
     pa_config['skip_dims'] = 'all' if io_type == 'io_stream' else 'batch'
     set_default_paq_conf(pa_config)
 
-    inp = keras.Input(shape=(16))
+    inp = keras.Input(shape=(15))
     if 'PConcatenate' in layer:
         _inp = [HQuantize()(inp)] * 2
         out = eval(layer)(_inp)
-        out = HDense(16)(out)
+        out = HDense(15)(out)
         return keras.Model(inp, out)
     elif 'Signature' in layer:
         _inp = eval(layer)(inp)
-        out = HDense(16)(_inp)
+        out = HDense(15)(_inp)
         return keras.Model(inp, out)
     elif 'Pool2D' in layer:
-        _inp = PReshape((4, 4, 1))(HQuantize()(inp))
+        _inp = PReshape((3, 5, 1))(HQuantize()(inp))
     elif 'Pool1D' in layer:
-        _inp = PReshape((16, 1))(HQuantize()(inp))
+        _inp = PReshape((5, 3))(HQuantize()(inp))
     elif 'Dense' in layer or 'Activation' in layer:
         _inp = HQuantize()(inp)
     elif 'Flatten' in layer:
         out = HQuantize()(inp)
-        out = PReshape((4, 4))(out)
+        out = PReshape((3, 5))(out)
         out = HConv1D(2, 2)(out)
         out = eval(layer)(out)
-        out = HDense(16)(out)
+        out = HDense(15)(out)
         return keras.Model(inp, out)
     else:
         raise Exception(f'Please add test for {layer}')
@@ -57,8 +57,8 @@ def create_model(layer: str, rnd_strategy: str, io_type: str):
 
 def get_data(N: int, sigma: float, max_scale: float, seed):
     rng = np.random.default_rng(seed)
-    a1 = rng.normal(0, sigma, (N, 16)).astype(np.float32)
-    a2 = rng.uniform(0, max_scale, (1, 16)).astype(np.float32)
+    a1 = rng.normal(0, sigma, (N, 15)).astype(np.float32)
+    a2 = rng.uniform(0, max_scale, (1, 15)).astype(np.float32)
     return (a1 * a2).astype(np.float32)
 
 
@@ -72,9 +72,10 @@ def parallel_avg_pool_cond(a, b):
                          [
                              "PConcatenate()",
                              "PMaxPool1D(2, padding='same')",
-                             "PMaxPool2D((2,2), padding='same')",
+                             "PMaxPool1D(4, padding='same')",
+                             "PMaxPool2D((5,3), padding='same')",
                              "PMaxPool1D(2, padding='valid')",
-                             "PMaxPool2D((2,2), padding='valid')",
+                             "PMaxPool2D((2,3), padding='valid')",
                              "Signature(1,6,3)",
                              "PAvgPool1D(2, padding='same')",
                              "PAvgPool2D((1,2), padding='same')",
@@ -90,7 +91,7 @@ def parallel_avg_pool_cond(a, b):
 @pytest.mark.parametrize("io_type", ['io_parallel', 'io_stream'])
 @pytest.mark.parametrize("cover_factor", [0.5, 1.0])
 @pytest.mark.parametrize("aggressive", [True, False])
-@pytest.mark.parametrize("backend", ['vivado'])
+@pytest.mark.parametrize("backend", ['vivado', 'vitis'])
 @pytest.mark.parametrize("seed", [42])
 def test_syn_players(layer, N: int, rnd_strategy: str, io_type: str, cover_factor: float, aggressive: bool, backend: str, seed: int):
     dir = get_test_dir()
@@ -101,15 +102,10 @@ def test_syn_players(layer, N: int, rnd_strategy: str, io_type: str, cover_facto
     if 'Signature' in layer:
         q = gfixed(1, 6, 3)
         data = q(data).numpy()
+    if "padding='same'" in layer and io_type == 'io_stream':
+        pytest.skip("io_stream does not support padding='same' for pools at the moment")
 
-    cond = None
-    if 'AvgPool' in layer and io_type == 'io_parallel':
-        if cover_factor < 1.0:
-            # pass
-            pytest.skip('AvgPool\'s accum is not configurable for io_parallel, and cover_factor < 1.0 leads to overflow cannot be emulated')
-        cond = parallel_avg_pool_cond
-        # mark as xfail if io_parallel and cover_factor < 1.0
-    run_model_test(model, cover_factor, data, io_type, backend, dir, aggressive, cond=cond)
+    run_model_test(model, cover_factor, data, io_type, backend, dir, aggressive)
 
 
 if __name__ == '__main__':

@@ -94,7 +94,7 @@ def custom_fn(x):
 @pytest.mark.parametrize("io_type", ['io_parallel', 'io_stream'])
 @pytest.mark.parametrize("cover_factor", [0.5, 1.0])
 @pytest.mark.parametrize("aggressive", [True, False])
-@pytest.mark.parametrize("backend", ['vivado'])
+@pytest.mark.parametrize("backend", ['vivado', 'vitis'])
 @pytest.mark.parametrize("seed", [42])
 def test_syn_hlayers(layer, N: int, rnd_strategy: str, io_type: str, cover_factor: float, aggressive: bool, backend: str, seed: int):
     dir = get_test_dir()
