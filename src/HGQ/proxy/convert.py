@@ -357,6 +357,8 @@ def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_off
 
         accum_fp_max_offset (default: None): If not None, autoset accumulator such that the model is bit accurate (when no overflow occurs and up to fp precision). If set, use the specified number of floating bits plus result float bits as accumulator float bits. May improve latency in some rare cases, not recommended in general.
 
+        unary_lut_max_table_size (default: -1): If greater than 0, use unary LUT for `HActivation` layers, when the required table size is less than or equal to the specified value. If set to -1, do not use unary LUT.
+
     """
 
     if accum_fp_max_offset is not None and not aggressive:
