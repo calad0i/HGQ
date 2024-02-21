@@ -50,6 +50,17 @@ Heterogenerous layers (`H-` prefix):
 - `HAdd`: Element-wise addition.
 - `HDenseBatchNorm`: `HDense` with fused batch normalization. No resource overhead when converting to hls4ml.
 - `HConv*DBatchNorm`: `HConv*D` with fused batch normalization. No resource overhead when converting to hls4ml.
+- (New in 0.2) `HActivation` with **arbitrary unary function**. (See note below.)
+
+```{note}
+`HActivation` will be converted to a general `unary LUT` in `to_proxy_model` when
+ - the required table size is smaller or equal to `unary_lut_max_table_size`.
+ - the corresponding function is not `relu`.
+
+Here, table size is determined by $2^{bw_{in}}$, where $bw_{in}$ is the bitwidth of the input.
+
+If the condition is not met, already supported activations like `tanh` or `sigmoid` will be done in the traditional way. However, if a arbitrary unary function is used, the conversion will fail. Thus, when using arbitrary unary functions, make sure that the table size is small enough.
+```
 
 ```{note}
 `H*BatchNorm` layers require both scaling and shifting parameters to be fused into the layer. Thus, when bias is set to `False`, shifting will not be available.
@@ -63,6 +74,14 @@ Passive layers (`P-` prefix):
 - `PReshape`: Reshape layer.
 - `PFlatten`: Flatten layer.
 - `Signature`: Does nothing, but marks the input to the next layer as already quantized to specified bitwidth.
+
+```{note}
+Average pooling layers are now bit-accurate, with the requirement that **all** individual pool size is a power of 2. This include all padded pools, with are with smaller sizes, if any.
+```
+
+```{warning}
+As of hls4ml v0.9.1, padding in pooling layers with `io_stream` is not supported. If you are using `io_stream`, please make sure that the padding is set to `valid`. For more details, merely setting `padding='same'` is fine, but no actual padding may be performed, or the generated firmware will fail at an assertion.
+```
 
 ## Commonly used functions
 
@@ -95,4 +114,8 @@ Though the proxy model is bit-accurate with hls4ml in general, exceptions exist:
 
 ```{tip}
 The proxy model can also be used to convert a `QKeras` model to a bit-accurate hls4ml-ready proxy model. See more details in the [Regarding QKeras](qkeras.md) section.
+```
+
+```{warning}
+Experimental: Nested layer structure is now supported by `to_keras_model` in v0.2.0. If you pass a model with nested layers, the function will flatten the model. However, be careful that some information in the inner models (e.g., `parallelization_factor`) may be lost during the conversion.
 ```
