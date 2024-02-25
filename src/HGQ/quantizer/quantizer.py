@@ -257,7 +257,7 @@ class HGQ:
                     k = np.zeros_like(self._max)
                 else:
                     i_neg = np.ceil(np.log2(np.abs(self._min)))  # type:ignore
-                    i_pos = np.ceil(np.log2(np.abs(self._max) + 2**-f))  # type:ignore
+                    i_pos = np.ceil(np.log2(np.abs(self._max + 2.**-f)))  # type:ignore
                     i = np.maximum(i_neg, i_pos)
                     k = (self._min.numpy() < 0)  # type:ignore
             i = np.clip(i, -f - k, 32)
