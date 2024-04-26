@@ -13,6 +13,7 @@ from HGQ.utils import apf_to_tuple, tuple_to_apf
 LUT_SIZE_LIMITATION = int(os.environ.get('LUT_SIZE_LIMITATION', 2**12))
 
 
+@keras.utils.register_keras_serializable(package='HGQ')
 class UnaryLUT(Layer):
     proxy_ready = True
 
@@ -33,7 +34,7 @@ class UnaryLUT(Layer):
             self.table = tf.Variable(table, dtype='float32', trainable=False, name='table')
         super().__init__(**kwargs)
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, **kwargs):  # type:ignore
         if not self.built:
             self.build(inputs.shape)
         inputs = tf.round(inputs * self.scale)

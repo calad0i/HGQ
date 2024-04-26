@@ -143,6 +143,7 @@ def fixed(bits, integer_bits, RND='TRN', SAT='WRAP') -> Callable:
     return gfixed(1, bits, integer_bits, RND, SAT)
 
 
+@keras.utils.register_keras_serializable(package='HGQ')
 class FixedPointQuantizer(keras.layers.Layer, metaclass=abc.ABCMeta):
 
     def __init__(self, keep_negative, bits, integers, RND: str = 'TRN', SAT: str = 'WRAP', overrides: dict | None = None, **kwargs):
@@ -174,7 +175,7 @@ class FixedPointQuantizer(keras.layers.Layer, metaclass=abc.ABCMeta):
 
         super().__init__(trainable=False, **kwargs)
 
-    def call(self, x, training=None):
+    def call(self, x, training=None):  # type:ignore
         assert not training, "Proxy model shall can not be trained!"
         if not self.built:
             self.build(x.shape)

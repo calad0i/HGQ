@@ -16,7 +16,7 @@ from hls4ml.converters import convert_from_keras_model
 from tensorflow import keras
 
 from HGQ import trace_minmax
-from HGQ.proxy import FixedPointQuantizer, UnaryLUT, to_proxy_model
+from HGQ.proxy import FixedPointQuantizer, to_proxy_model
 
 tf.get_logger().setLevel('ERROR')
 
@@ -76,7 +76,7 @@ def _run_model_sl_test(model: keras.Model, proxy: keras.Model, data, output_dir:
     model_loaded: keras.Model = keras.models.load_model(output_dir + '/keras.h5')  # type: ignore
 
     proxy.save(output_dir + '/proxy.h5')
-    proxy_loaded: keras.Model = keras.models.load_model(output_dir + '/proxy.h5', custom_objects={'FixedPointQuantizer': FixedPointQuantizer, 'UnaryLUT': UnaryLUT})  # type: ignore
+    proxy_loaded: keras.Model = keras.models.load_model(output_dir + '/proxy.h5')  # type: ignore
     for l1, l2 in zip(proxy.layers, proxy_loaded.layers):
         if not isinstance(l1, FixedPointQuantizer):
             continue
