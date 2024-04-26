@@ -92,7 +92,7 @@ def custom_fn(x):
 @pytest.mark.parametrize("N", [1000])
 @pytest.mark.parametrize("rnd_strategy", ['auto', 'standard_round', 'floor'])
 @pytest.mark.parametrize("io_type", ['io_parallel', 'io_stream'])
-@pytest.mark.parametrize("cover_factor", [0.5, 1.0])
+@pytest.mark.parametrize("cover_factor", [0.25, 1.0])
 @pytest.mark.parametrize("aggressive", [True, False])
 @pytest.mark.parametrize("backend", ['vivado', 'vitis'])
 @pytest.mark.parametrize("seed", [42])
@@ -103,7 +103,10 @@ def test_syn_hlayers(layer, N: int, rnd_strategy: str, io_type: str, cover_facto
     data = get_data(N, 1, 1, seed)
 
     test_grad = N > 100
-    cond = None if 'softmax' not in layer else softmax_cond
+    cond = None
+    if 'softmax' in layer:
+        cond = softmax_cond
+        cover_factor = max(cover_factor, 0.5)  # Softmax table size is sensitive to range
 
     skip_sl_test = 'custom' in layer
     run_model_test(model,

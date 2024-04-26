@@ -43,6 +43,8 @@ def create_model(layer: str, rnd_strategy: str, io_type: str):
         raise Exception(f'Please add test for {layer}')
 
     out = eval(layer)(_inp)
+    if 'maxpool' in layer.lower():
+        out = HQuantize()(out)
     model = keras.Model(inp, out)
 
     for layer in model.layers:
@@ -60,12 +62,6 @@ def get_data(N: int, sigma: float, max_scale: float, seed):
     a1 = rng.normal(0, sigma, (N, 15)).astype(np.float32)
     a2 = rng.uniform(0, max_scale, (1, 15)).astype(np.float32)
     return (a1 * a2).astype(np.float32)
-
-
-def parallel_avg_pool_cond(a, b):
-    close: np.ndarray = np.abs(a - b) < 1e-2
-
-    assert np.all(close), f"Keras-Proxy mismatch for approx avg pool: {np.sum(np.any(~close, axis=tuple(range(1,close.ndim))))} out of {a.shape[0]} samples are very different. Sample: {a[~close].ravel()[:5]} vs {b[~close].ravel()[:5]}"
 
 
 @pytest.mark.parametrize('layer',
@@ -89,7 +85,7 @@ def parallel_avg_pool_cond(a, b):
 @pytest.mark.parametrize("N", [1000])
 @pytest.mark.parametrize("rnd_strategy", ['auto', 'standard_round', 'floor'])
 @pytest.mark.parametrize("io_type", ['io_parallel', 'io_stream'])
-@pytest.mark.parametrize("cover_factor", [0.5, 1.0])
+@pytest.mark.parametrize("cover_factor", [0.25, 1.0])
 @pytest.mark.parametrize("aggressive", [True, False])
 @pytest.mark.parametrize("backend", ['vivado', 'vitis'])
 @pytest.mark.parametrize("seed", [42])
