@@ -57,7 +57,7 @@ def get_data(N: int, sigma: float, max_scale: float, seed):
 
 def softmax_cond(proxy, hls):
     match_precent = np.mean(np.argmax(proxy, axis=1) == np.argmax(hls, axis=1))
-    assert match_precent > 0.90, f"Keras-Proxy mismatch: {(1-match_precent) * 100}% of samples are different. Sample: {proxy[:5]} vs {hls[:5]}"
+    assert match_precent > 0.90, f"Proxy-HLS4ML mismatch: {(1-match_precent) * 100}% of samples are different. Sample: {proxy[:5]} vs {hls[:5]}"
 
 
 def custom_fn(x):
