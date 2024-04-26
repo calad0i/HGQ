@@ -53,7 +53,7 @@ Heterogenerous layers (`H-` prefix):
 - (New in 0.2) `HActivation` with **arbitrary unary function**. (See note below.)
 
 ```{note}
-`HActivation` will be converted to a general `unary LUT` in `to_proxy_model` when
+`HActivation` will be converted to a general `unaryLUT` in `to_proxy_model` when
  - the required table size is smaller or equal to `unary_lut_max_table_size`.
  - the corresponding function is not `relu`.
 

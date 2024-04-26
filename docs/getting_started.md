@@ -1,7 +1,7 @@
 # Quick Start
 
-```{warning}
-This guide is only for models with fully heterogeneous quantized weights. For models with partially-heterogeneous quantized weights, please refer to the [Full Usage](#Full Usage) guide.
+```{note}
+This guide is only for models with fully heterogeneous quantized weights (per-weight bitwidth).
 ```
 
 ## Model definition & training
