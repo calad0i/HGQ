@@ -13,6 +13,8 @@ High Granularity Quantization
    :target: https://calad0i.github.io/HGQ/
 .. image:: https://badge.fury.io/py/hgq.svg
    :target: https://badge.fury.io/py/hgq
+.. image:: https://img.shields.io/badge/arXiv-2405.00645-b31b1b.svg
+   :target: https://arxiv.org/abs/2405.00645
 
 HGQ is an gradient-based automatic bitwidth optimization and quantization-aware training algorithm for neural networks to be deployed on FPGAs, By laveraging gradients, it allows for bitwidth optimization at arbitrary granularity, up to per-weight and per-activation level.
 

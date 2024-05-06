@@ -6,6 +6,7 @@
 [![License Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Documentation](https://github.com/calad0i/HGQ/actions/workflows/sphinx-build.yml/badge.svg)](https://calad0i.github.io/HGQ/)
 [![PyPI version](https://badge.fury.io/py/hgq.svg)](https://badge.fury.io/py/hgq)
+[![ArXiv](https://img.shields.io/badge/arXiv-2405.00645-b31b1b.svg)](https://arxiv.org/abs/2405.00645)
 
 
 HGQ is an gradient-based automatic bitwidth optimization and quantization-aware training algorithm for neural networks to be deployed on FPGAs, By laveraging gradients, it allows for bitwidth optimization at arbitrary granularity, up to per-weight and per-activation level.
