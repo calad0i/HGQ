@@ -248,7 +248,7 @@ class HGQ:
         """
 
         if ref is None and self.minmax_record:
-            assert tf.reduce_all(self._min <= self._max), "Some min values are larger than max values. Did you forget to run trace_minmax?"  # type: ignore
+            assert tf.reduce_all(self._max - self._min >= 0), "Some min values are larger than max values. Did you forget to run trace_minmax?"  # type: ignore
             f = tf.round(self.fbw).numpy()  # type: ignore
             with np.errstate(divide='ignore'):
                 if pos_only:
