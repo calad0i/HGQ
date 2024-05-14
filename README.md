@@ -21,7 +21,7 @@ Compare to the other heterogeneous quantization approach, like the QKeras counte
   - still subject to machine float precision limitation.
 - **Accurate Resource Estimation**: BOPs estimated by HGQ is roughly #LUTs + 55#DSPs for actual (post place & route) FPGA resource consumption. This metric is available during training, and one can estimate the resource consumption of the final model in a very early stage.
 
-Depending on the specific [application](https://arxiv.org/abs/2006.10159), HGQ could achieve up to 20x resource reduction compared to the `AutoQkeras` approach, while maintaining the same accuracy. For some more challenging [tasks](https://arxiv.org/abs/2202.04976), where the model is already under-fitted, HGQ could still improve the performance under the same on-board resource consumption. For more details, please refer to our paper (link coming soon).
+Depending on the specific [application](https://arxiv.org/abs/2006.10159), HGQ could achieve up to 20x resource reduction compared to the `AutoQkeras` approach, while maintaining the same accuracy. For some more challenging [tasks](https://arxiv.org/abs/2202.04976), where the model is already under-fitted, HGQ could still improve the performance under the same on-board resource consumption. For more details, please refer to our paper [here](https://arxiv.org/abs/2405.00645).
 
 ## Installation
 
