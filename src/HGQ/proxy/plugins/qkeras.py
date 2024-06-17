@@ -161,5 +161,5 @@ for layer_cls in qkeras_layers:
 
 
 def init():
-    ProxyLayerXFormer.__call__.register(QKerasBaseLayer, qlayer_to_proxy_layer)
+    ProxyLayerXFormer.__call__.register(QKerasBaseLayer, qlayer_to_proxy_layer)  # type: ignore
     get_produced_kif.register(qkeras.QActivation, get_produced_kif.registry[keras.layers.Activation])

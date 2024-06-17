@@ -93,7 +93,7 @@ class HBatchNormBase(HLayerBase):
 
     @property
     @tf.function(jit_compile=True)
-    def fused_kernel(self):
+    def fused_kernel(self):  # type: ignore
         if not self.scale:
             return self.kernel
         scale = self.bn_gamma * tf.math.rsqrt(self.moving_variance + self.epsilon)
@@ -101,7 +101,7 @@ class HBatchNormBase(HLayerBase):
 
     @property
     @tf.function(jit_compile=True)
-    def fused_bias(self):
+    def fused_bias(self):  # type: ignore
         if not self.center:
             return self.bias
         scale = self.bn_gamma * tf.math.rsqrt(self.moving_variance + self.epsilon)

@@ -110,7 +110,7 @@ def _(layer: keras.layers.Activation | keras.layers.ReLU | keras.layers.LeakyReL
             return 0, 1, 65535
     if isinstance(layer, keras.layers.Softmax):
         return 0, 1, 65535
-    k, i, f = activation_kif_forward(layer, *np.max(kifs, axis=0))
+    k, i, f = activation_kif_forward(layer, *np.max(kifs, axis=0))  # type: ignore
     return k, i, f
 
 
@@ -127,7 +127,7 @@ def _(layer: AvgPool1D | AvgPool2D | AvgPool3D):
 @get_produced_kif.register
 def _(layer: keras.layers.Add):
     kifs = get_input_kifs(layer)
-    k, i, f = np.max(kifs, axis=0)
+    k, i, f = np.max(kifs, axis=0)  # type: ignore
     # being lazy here. But this will never overflow.
     i += int(np.ceil(np.log2(len(kifs))))
     return k, i, f
@@ -136,7 +136,7 @@ def _(layer: keras.layers.Add):
 @get_produced_kif.register
 def _(layer: keras.layers.Concatenate):
     kifs = get_input_kifs(layer)
-    k, i, f = np.max(kifs, axis=0)
+    k, i, f = np.max(kifs, axis=0)  # type: ignore
     return k, i, f
 
 
@@ -322,7 +322,7 @@ def get_config_table_tablesize_result(layer: keras.layers.Activation):
     i_kifs = get_input_kifs(layer)
     if len(i_kifs) > 1:
         warn(f'Activation layer {layer.name} has more than one input. Did you just make a activation with multiple inputs? table_size set in this way may make no sense. Proceed only if you know what you are doing.')
-    i_k, i_i, i_f = np.max(i_kifs, axis=0)
+    i_k, i_i, i_f = np.max(i_kifs, axis=0)  # type: ignore
     table_size = int(2**(i_k + i_i + i_f))  # ...the ideal case. Will be the case if we have universal LUT-based activation.
     if layer.activation is keras.activations.tanh:
         table_size = int(8 / 2.**-i_f)  # LUT Range hardcoded to -4 ~ 4, match #fractional bits
