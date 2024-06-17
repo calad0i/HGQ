@@ -41,7 +41,9 @@ def qkeras_quantizer_to_layers(quantizer, SAT) -> tuple[keras.layers.Layer, ...]
         e.g.: quantized_bits -> (fixed,)
               quantized_relu -> (fixed, relu, fixed)
     """
-    raise TypeError(f"Unknown quantizer type {type(quantizer)}")
+    if quantizer is keras.activations.linear:
+        return ()
+    return keras.layers.Activation(quantizer),
 
 
 @qkeras_quantizer_to_layers.register
@@ -119,7 +121,7 @@ def qlayer_to_keras_layer(layer: keras.layers.Layer) -> keras.layers.Layer | Non
     if hasattr(layer, 'kernel'):
         q = layer.kernel_quantizer_internal or (lambda x: x)
         klayer.kernel.assign(q(layer.kernel))
-    if hasattr(layer, 'bias'):
+    if hasattr(layer, 'bias') and layer.use_bias:
         q = layer.bias_quantizer_internal or (lambda x: x)
         klayer.bias.assign(q(layer.bias))
     return klayer
