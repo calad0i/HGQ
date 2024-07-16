@@ -4,8 +4,8 @@ import tensorflow as tf
 
 @tf.custom_gradient
 def floatlet_quantize(x, m, e, e0=0):
-    '''Quantize an array to floatlet (m mantissa bits, e exponent bits) format. Tentative gradient impl.'''
-    # m+=1
+    '''Quantize an array to floatlet (m mantissa bits, excl. sign bit, e exponent bits) format. Tentative gradient impl.'''
+    m = m + 1
     two = tf.constant(2.0, dtype=tf.float32)
     log2 = tf.math.log(two)
     eps = tf.constant(1e-30, dtype=tf.float32)
@@ -13,12 +13,12 @@ def floatlet_quantize(x, m, e, e0=0):
     e_req = tf.math.floor(tf.math.log(tf.abs(x) + eps) / log2)  # type: ignore
     _e_high = two**(e - 1)
     e_low, e_high = -_e_high + e0, _e_high + e0 - 1
-    e_act = tf.minimum(e_req, e_high)
+    e_act = tf.clip_by_value(e_req, e_low + 1, e_high)
     scale = two**(e_act - m + 1)
     sig = x / scale
     qsig = tf.floor(sig + 0.5)
     clip_sig = tf.clip_by_value(qsig, -two**m + 1, two**m - 1)
-    qx = clip_sig * scale * tf.cast(e_act > e_low, tf.float32)
+    qx = clip_sig * scale * tf.cast(e_req > e_low, tf.float32)
 
     def grad(dy: tf.Tensor):
         dm = scale * (sig - qsig) * dy * log2
