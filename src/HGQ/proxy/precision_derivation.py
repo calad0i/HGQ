@@ -3,7 +3,7 @@ from functools import singledispatch
 
 import numpy as np
 import tensorflow as tf
-from keras.layers import AvgPool1D, AvgPool2D, AvgPool3D, Concatenate, Flatten, MaxPool1D, MaxPool2D, MaxPool3D, Reshape
+from keras.layers import AvgPool1D, AvgPool2D, AvgPool3D, Concatenate, Flatten, MaxPool1D, MaxPool2D, MaxPool3D, Permute, Reshape
 from keras.src.layers.convolutional.base_conv import Conv
 from keras.src.layers.pooling.base_pooling1d import Pooling1D
 from keras.src.layers.pooling.base_pooling2d import Pooling2D
@@ -159,7 +159,7 @@ def _(layer: keras.layers.Dense | Conv):
 
 
 @get_produced_kif.register
-def _(layer: Reshape | Flatten | MaxPool3D | MaxPool2D | MaxPool1D):
+def _(layer: Reshape | Flatten | MaxPool3D | MaxPool2D | MaxPool1D | Permute):
     kifs = get_input_kifs(layer)
     assert len(kifs) == 1, f'Flatten/Reshape layer {layer.name} has more than one input. This is not supported.'
     k, i, f = kifs[0]

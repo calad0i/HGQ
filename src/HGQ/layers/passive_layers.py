@@ -175,3 +175,8 @@ PAvgPool1D = PAveragePooling1D
 @register_keras_serializable(package="HGQ")
 class PDropout(PLayerBase, tf.keras.layers.Dropout):
     pass
+
+
+@register_keras_serializable(package="HGQ")
+class PPermute(PLayerBase, tf.keras.layers.Permute):
+    pass
