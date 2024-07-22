@@ -10,6 +10,8 @@ from keras.src.utils import tf_utils
 
 from ..base import ABSBaseLayer, HLayerBase
 from ..dense import HDense
+from ..misc import HActivation, HAdd, HQuantize
+from ..passive_layers import PDropout, PPermute, PReshape
 
 
 class MatMul(Layer):
@@ -22,21 +24,35 @@ class MatMul(Layer):
         return tf.matmul(x[0], x[1], transpose_a=self.transpose_a, transpose_b=self.transpose_b)
 
     def compute_output_shape(self, input_shape):
-        return input_shape[0][:-1] + input_shape[1][-1:]
+        left = input_shape[0][:-2]
+        x1 = input_shape[0][-1] if self.transpose_a else input_shape[0][-2]
+        x2 = input_shape[1][-2] if self.transpose_b else input_shape[1][-1]
+        return [*left, x1, x2]
 
 # @register_keras_serializable(package="HGQ")
 
 
 class HMatMul(HLayerBase, MatMul):
+
+    def call(self, x, training=None, record_minmax=None):
+        if not self.built:
+            self.build(tuple(x.shape))
+
+        if record_minmax is None:
+            record_minmax = training or self.record_minmax
+
+        return self.forward(x, training=training, record_minmax=record_minmax)
+
     def forward(self, x, training=None, record_minmax=None):
         z = self.jit_forward(x, training=training, record_minmax=record_minmax)  # type: ignore
-        layer1, layer2 = self._inbound_nodes[0].inbound_layers
-        inp_bw1 = layer1.act_bw
-        inp_bw2 = layer2.act_bw
-        bops = tf.reduce_sum(tf.matmul(inp_bw1, inp_bw2, transpose_a=self.transpose_a, transpose_b=self.transpose_b))
-        self.bops.assign(bops)
-        bops = tf.cast(bops, tf.float32) * self.beta  # type: ignore
-        self.add_loss(bops)
+        if len(self._inbound_nodes) > 0:
+            layer1, layer2 = self._inbound_nodes[0].inbound_layers
+            inp_bw1 = layer1.act_bw
+            inp_bw2 = layer2.act_bw
+            bops = tf.reduce_sum(tf.matmul(inp_bw1, inp_bw2, transpose_a=self.transpose_a, transpose_b=self.transpose_b))
+            self.bops.assign(bops)
+            bops = tf.cast(bops, tf.float32) * self.beta  # type: ignore
+            self.add_loss(bops)
         return z
 
     @tf.function(jit_compile=True)
@@ -105,7 +121,7 @@ class HDiv(HLayerBase):
         return input_shape[0]
 
 
-class _MultiHeadAttention(Layer, metaclass=ABCMeta):
+class HMultiHeadAttention(Layer, metaclass=ABCMeta):
     def __init__(
         self,
         num_heads,
@@ -151,46 +167,50 @@ class _MultiHeadAttention(Layer, metaclass=ABCMeta):
 
     def attn_model_build(self, q_dim, k_dim, v_dim):
         with tf_utils.maybe_init_scope(self):  # type: ignore
-            to_q = Dense(self._key_dim * self._num_heads, use_bias=self._use_bias, name=f"{self.name}_to_q")
-            to_k = Dense(self._key_dim * self._num_heads, use_bias=self._use_bias, name=f"{self.name}_to_k")
-            to_v = Dense(self._value_dim * self._num_heads, use_bias=self._use_bias, name=f"{self.name}_to_v")
-            to_out = Dense(v_dim, use_bias=self._use_bias, name=f"{self.name}_to_out")
-            dropout = Dropout(rate=self._dropout)
-            norm = Softmax(axis=-1)
+            to_q = HDense(self._key_dim * self._num_heads, use_bias=self._use_bias, name=f"{self.name}_to_q")
+            to_k = HDense(self._key_dim * self._num_heads, use_bias=self._use_bias, name=f"{self.name}_to_k")
+            to_v = HDense(self._value_dim * self._num_heads, use_bias=self._use_bias, name=f"{self.name}_to_v")
+            to_out = HDense(v_dim, use_bias=self._use_bias, name=f"{self.name}_to_out")
+            dropout = PDropout(rate=self._dropout)
+            norm = HActivation('softmax')
         self._query_shape = q_dim
         self._key_shape = k_dim
         self._value_shape = v_dim
         self._built_from_signature = True
 
-        q = keras.Input(shape=(None, q_dim))
-        k = keras.Input(shape=(None, k_dim))
-        v = keras.Input(shape=(None, v_dim))
-        mask = keras.Input(shape=(None, None, None))
+        q = keras.Input(shape=(50, q_dim))
+        k = keras.Input(shape=(50, k_dim))
+        v = keras.Input(shape=(50, v_dim))
+        mask = keras.Input(shape=(50, 50))
+        _mask = tf.repeat(mask[:, None], self._num_heads, axis=1)
+        _q = HQuantize()(q)
+        _k = HQuantize()(k)
+        _v = HQuantize()(v)
 
         # [B, N, HD]
-        Q = to_q(q)
-        K = to_k(k)
-        V = to_v(v)
+        Q = to_q(_q)
+        K = to_k(_k)
+        V = to_v(_v)
 
         # [B, N, H, D]
-        Q = Reshape([-1, self._num_heads, self._key_dim])(Q)
-        K = Reshape([-1, self._num_heads, self._key_dim])(K)
-        V = Reshape([-1, self._num_heads, self._value_dim])(V)
+        Q = PReshape([-1, self._num_heads, self._key_dim])(Q)
+        K = PReshape([-1, self._num_heads, self._key_dim])(K)
+        V = PReshape([-1, self._num_heads, self._value_dim])(V)
 
         # [B, H, N, D]
-        Q = Permute([2, 1, 3])(Q)
-        K = Permute([2, 1, 3])(K)
-        V = Permute([2, 1, 3])(V)
+        Q = PPermute([2, 1, 3])(Q)
+        K = PPermute([2, 1, 3])(K)
+        V = PPermute([2, 1, 3])(V)
 
         # [B, H, NQ, NK]
-        QK = MatMul(transpose_b=True)([Q, K])
-        QK = Scale(float(1 / tf.math.sqrt(tf.cast(K.shape[-1], tf.float32)).numpy()))(QK)  # Broken
-        QK = keras.layers.Add()([QK, mask])
+        QK = HMatMul(transpose_b=True)([Q, K])
+        QK = HScale(float(1 / tf.math.sqrt(tf.cast(K.shape[-1], tf.float32)).numpy()))(QK)  # Broken
+        QK = HAdd()([QK, _mask])
         QK = norm(QK)
         QK = dropout(QK)
-        out = MatMul()([QK, V])
-        out = Permute([2, 1, 3])(out)
-        out = Reshape([-1, self._value_dim * self._num_heads])(out)
+        out = HMatMul()([QK, V])
+        out = PPermute([2, 1, 3])(out)
+        out = PReshape([-1, self._value_dim * self._num_heads])(out)
         out = to_out(out)
 
         model = keras.Model([q, k, v, mask], [out, QK])
