@@ -23,6 +23,7 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
         kq_conf=None,
         paq_conf=None,
         beta=0.,
+        parallel_factor=None,
         **kwargs,
     ):
         super().__init__(
@@ -41,6 +42,8 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
             beta=beta,
             **kwargs
         )
+        self.parallel_factor = parallel_factor
+        """Acting like `parallelization_factor` in conv, but for multi-dimension dense layer (matmul operation)."""
 
     def forward(self, x, training=None, record_minmax=None):
 
@@ -75,6 +78,12 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
         bops = np.sum(np.matmul(input_bw, kernel_bw))  # type: ignore
         self.bops.assign(tf.constant(bops, dtype=tf.float32))
         return bops
+
+    def post_build(self, input_shape):
+        super().post_build(input_shape)
+        if self.parallel_factor is None:
+            if len(input_shape) > 2:
+                self.parallel_factor = int(np.prod(input_shape[1:-1]))
 
 
 @register_keras_serializable(package="HGQ")

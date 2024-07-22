@@ -309,7 +309,7 @@ class ProxyLayerXFormer:
             inputs = [keras.layers.Input(shape=shape[1:]) for shape in input_shape]
 
         overrides = {'layers': {}}
-        if hasattr(layer, 'parallel_factor'):
+        if hasattr(layer, 'parallel_factor') and layer.parallel_factor is not None:
             parallel_factor = layer.parallel_factor
             overrides = {'layers': {name: {'parallelization_factor': int(parallel_factor)}}}
 
@@ -321,8 +321,8 @@ class ProxyLayerXFormer:
                 rk, rb, ri, R, S = self.get_kbiRS(layer, pos_only=True)
 
                 f_add_bits = 0 if R == 'TRN' else 1 if R == 'RND' else 2
-                fq1 = FixedPointQuantizer(k, b + f_add_bits, i, SAT=S, RND='TRN', name=f'{name}_quantizer')
-                fq2 = FixedPointQuantizer(rk, rb, ri, SAT=S, RND=R, name=f'{name}_relu_quantizer', overrides=overrides)
+                fq1 = FixedPointQuantizer(k, b + f_add_bits, i, SAT=S, RND='TRN', name=f'{name}_quantizer', overrides=overrides)
+                fq2 = FixedPointQuantizer(rk, rb, ri, SAT=S, RND=R, name=f'{name}_relu_quantizer')
                 return keras.Model(inputs, fq2(keras.layers.ReLU()(fq1(klayer(inputs)))))
 
         k, b, i, R, S = self.get_kbiRS(layer)
