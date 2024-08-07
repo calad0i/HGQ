@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "HGQ"
-version = "0.2.2"
+version = "0.2.3"
 authors = [{ name = "Chang Sun", email = "chsun@cern.ch" }]
 description = "High Granularity Quantizarion"
 readme = "README.md"
@@ -16,7 +16,7 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Operating System :: OS Independent",
   "License :: OSI Approved :: Apache Software License",
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
 ]
 
 dependencies = ['tensorflow>=2.13', 'numpy>=1.23', 'keras<3']
@@ -31,7 +31,7 @@ write_to = "src/HGQ/_version.py"
 docs = ["sphinx", "sphinx-rtd-theme", "myst-parser", "qkeras", "pyparsing"]
 
 test = [
-  # "git+https://github.com/calad0i/hls4ml@HGQ-integration",
+  "hls4ml>=1.0",
   "qkeras",
   "pytest",
   "pytest-xdist",

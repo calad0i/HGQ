@@ -1,9 +1,9 @@
 # Installation
 
-Use `pip install HGQ` to install the latest version from PyPI. You will need a environment with `python>=3.10` installed. Currently, only `python3.10 and 3.11` are tested.
+Use `pip install HGQ` to install the latest version from PyPI. You will need an environment with `python>=3.10` installed. Currently, only `python3.10 and 3.11` are tested.
 
 ```{warning}
-This framework requires an **unmerged** [PR](https://github.com/fastmachinelearning/hls4ml/pull/914) of hls4ml. Please install it by running `pip install "git+https://github.com/calad0i/hls4ml@HGQ-integration"`. Or, conversion will fail with unsupported layer error.
+This package requires `hls4ml>=1.0` to handle model conversion to HLS projects. As of now, the PyPI release of hls4ml (0.9) is still not compatible with HGQ's models, and one will still need to install the latest version of hls4ml from github: `pip install "git+https://github.com/fastmachinelearning/hls4ml"`. Future PyPI releases of hls4ml (>=1.0) will support HGQ models.
 ```
 
 ```{warning}
