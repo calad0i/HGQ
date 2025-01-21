@@ -343,6 +343,15 @@ def get_config(layer: keras.layers.Layer, accum_fp_max_offset: None | int = None
         k, i, f, RND, SAT = get_result_kifRS(layer)
         result_t = tuple_to_apf((k, i, f), RND, SAT)
         conf = {'result_t': result_t}
+
+    for k, v in conf.items():
+        if not k.endswith('_t'):
+            continue
+        if not isinstance(v, str):
+            raise ValueError(f'Layer {layer.name} has invalid {k}={v}. This should be a string.')
+        _, i, f = apf_to_tuple(v)
+        if i + f > 64:
+            raise ValueError(f'Layer {layer.name} has huge bitwidth: {k}={v}. This will crash the firmware. This usually happens when the a layer is not properly quantized.')
     return conf
 
 
