@@ -39,7 +39,7 @@ def qkeras_quantizer_to_layers(quantizer, SAT) -> tuple[keras.layers.Layer, ...]
     """
     Map qkeras quantizer to a tuple of equivalent proxy layers.
         e.g.: quantized_bits -> (fixed,)
-              quantized_relu -> (fixed, relu, fixed)
+              quantized_relu -> (relu, fixed)
     """
     if quantizer is keras.activations.linear:
         return ()
@@ -69,10 +69,9 @@ def _(quantizer: quantizers.quantized_bits, SAT):
 def _(quantizer: quantizers.quantized_relu, SAT):
     i = quantizer.integer
     b = quantizer.bits
-    q0 = FixedPointQuantizer(1, b + 1, i + 1, 'RND_CONV', SAT)
-    q1 = FixedPointQuantizer(0, b, i, 'RND_CONV', 'WRAP')
+    q = FixedPointQuantizer(0, b, i, 'RND_CONV', 'WRAP')
     relu = keras.layers.Activation('relu')
-    return q0, relu, q1
+    return relu, q
 
 
 @qkeras_quantizer_to_layers.register
