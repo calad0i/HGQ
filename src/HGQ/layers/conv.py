@@ -134,6 +134,13 @@ class HConv(HLayerBase, Conv):
         self.bops.assign(tf.constant(bops, dtype=tf.float32))
         return bops
 
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "parallel_factor": int(self.parallel_factor),
+        })
+        return config
+
 
 @register_keras_serializable(package="HGQ")
 class HConv2D(HConv):

@@ -85,6 +85,13 @@ class HDense(HLayerBase, tf.keras.layers.Dense):
             if len(input_shape) > 2:
                 self.parallel_factor = int(np.prod(input_shape[1:-1]))
 
+    def get_config(self):  # type: ignore
+        config = super().get_config()
+        config.update({
+            "parallel_factor": self.parallel_factor,
+        })
+        return config
+
 
 @register_keras_serializable(package="HGQ")
 class HDenseBatchNorm(HDense, HBatchNormBase):
