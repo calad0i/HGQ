@@ -1,5 +1,8 @@
 <img src="docs/_static/logo.svg" alt="HGQ-logo" width="230"/>
 
+# Notice
+
+HGQ 2 is now available! Please check out https://github.com/calad0i/HGQ2 for more details.
 
 # High Granularity Quantization
 
