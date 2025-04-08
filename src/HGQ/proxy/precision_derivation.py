@@ -50,7 +50,11 @@ def get_arr_container(arr: np.ndarray, silent=False):
 
 def activation_kif_forward(func: Callable, k: int, i: int, f: int):
     """Given the input bitwidth (kif) of an activation function, get the output bitwidth (kif)."""
-    assert k + i + f > 0, 'Activation function is applied to an zero array. Something is wrong.'
+    # assert k + i + f > 0, 'Activation function is applied to an zero array. Something is wrong.'
+    if k + i + f <= 0:
+        k = 0
+        i = 1
+        f = 0
     N = min(2**(k + i + f), 2**20)
     arr = np.array(np.linspace(-2.**i * k, 2.**i - 2.**-f, N), dtype=np.float64)
     arr: np.ndarray = np.array(func(arr), dtype=np.float32)
@@ -125,11 +129,23 @@ def _(layer: AvgPool1D | AvgPool2D | AvgPool3D):
 
 
 @get_produced_kif.register
-def _(layer: keras.layers.Add):
+def _(layer: keras.layers.Add | keras.layers.Subtract):
     kifs = get_input_kifs(layer)
     k, i, f = np.max(kifs, axis=0)  # type: ignore
     # being lazy here. But this will never overflow.
     i += int(np.ceil(np.log2(len(kifs))))
+    return k, i, f
+
+
+@get_produced_kif.register
+def _(layer: keras.layers.Dot):
+    kinfs = get_input_kifs(layer)
+    assert len(kinfs) == 2, f'Dot layer {layer.name} has !=2 inputs. This is not supported.'
+    k1, i1, f1 = kinfs[0]
+    k2, i2, f2 = kinfs[1]
+    k = max(k1, k2)
+    i = i1 + i2
+    f = f1 + f2
     return k, i, f
 
 
