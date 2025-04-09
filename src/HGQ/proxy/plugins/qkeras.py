@@ -69,7 +69,7 @@ def _(quantizer: quantizers.quantized_bits, SAT):
 def _(quantizer: quantizers.quantized_relu, SAT):
     i = quantizer.integer
     b = quantizer.bits
-    q = FixedPointQuantizer(0, b, i, 'RND_CONV', 'WRAP')
+    q = FixedPointQuantizer(0, b, i, 'RND_CONV', 'SAT')
     relu = keras.layers.Activation('relu')
     return relu, q
 
