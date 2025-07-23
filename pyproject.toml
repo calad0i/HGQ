@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "HGQ"
-version = "0.2.5post1"
+dynamic = [ "version" ]
 authors = [{ name = "Chang Sun", email = "chsun@cern.ch" }]
 description = "High Granularity Quantizarion"
 readme = "README.md"
