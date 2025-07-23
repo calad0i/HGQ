@@ -280,7 +280,7 @@ class ProxyLayerXFormer:
         if layer is None:
             return None
         try:
-            from hls4ml.converters.keras_to_hls import layer_handlers
+            from hls4ml.converters.keras_v2_to_hls import layer_handlers
         except ImportError:
             return layer
         cls_name = layer.__class__.__name__
@@ -348,7 +348,7 @@ class ProxyLayerXFormer:
         return layer
 
 
-def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_offset: int | None = None, unary_lut_max_table_size=-1):
+def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_offset: int | None = None, unary_lut_max_table_size=-1, skip_precision_reg=True):
     """Given a HGQ model, return a hls4ml-ready keras model.
 
     Args:
@@ -360,6 +360,8 @@ def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_off
 
         unary_lut_max_table_size (default: -1): If greater than 0, use unary LUT for `HActivation` layers, when the required table size is less than or equal to the specified value. If set to -1, do not use unary LUT.
 
+        skip_precision_reg (default: True): If True, do not register quantization configuration for the model. As of hls4ml 1.2.0, precision propagation is implemented in hls4ml and the precision configuration here is not needed and has no effect. Set to False if using a legacy version of hls4ml (before 1.2.0).
+
     """
 
     if accum_fp_max_offset is not None and not aggressive:
@@ -369,6 +371,7 @@ def to_proxy_model(model: keras.Model, aggressive: bool = True, accum_fp_max_off
     proxy = convert_model(model, layer_xformer=ProxyLayerXFormer('WRAP' if aggressive else 'SAT').__call__)
     if unary_lut_max_table_size > 0:
         proxy = convert_model(proxy, layer_xformer=partial(xfr_to_unary_lut, max_table_size=unary_lut_max_table_size))
-    for layer in proxy.layers:
-        register_qconf(layer, accum_fp_max_offset=accum_fp_max_offset)
+    if not skip_precision_reg:
+        for layer in proxy.layers:
+            register_qconf(layer, accum_fp_max_offset=accum_fp_max_offset)
     return proxy
