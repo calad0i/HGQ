@@ -3,6 +3,10 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+.. warning::
+   This project is superseded by [HGQ2](https://github.com/calad0i/HGQ2). The codebase will remain functional, but interfaces with downstream tools may be broken. Please consider migrating to HGQ2 for better performance and more features.
+
+
 ===========================
 High Granularity Quantization
 ===========================

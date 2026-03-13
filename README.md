@@ -1,8 +1,7 @@
+> [!WARNING]
+> This repository is superseded by [HGQ2](https://github.com/calad0i/HGQ2). The codebase will remain functional, but interfaces with downstream tools may be broken. Please consider migrating to HGQ2 for better performance and more features.
+
 <img src="docs/_static/logo.svg" alt="HGQ-logo" width="230"/>
-
-# Notice
-
-HGQ 2 is now available! Please check out https://github.com/calad0i/HGQ2 for more details.
 
 # High Granularity Quantization
 
